@@ -9,6 +9,14 @@ from .models import (
     ProjectMetadata,
 )
 from .persistence import ProjectFileAdapter, ProjectSerializer
+from .repository import (
+    InMemoryProjectRepository,
+    LocalProjectRepository,
+    ProjectNotFoundError,
+    ProjectRepository,
+    ProjectRepositoryError,
+    ProjectSummary,
+)
 
 __all__ = [
     "AutomationPoint",
@@ -16,8 +24,14 @@ __all__ = [
     "InstrumentModule",
     "Pattern",
     "PatternStep",
-    "Project",
+    "Project", 
     "ProjectMetadata",
     "ProjectFileAdapter",
     "ProjectSerializer",
+    "ProjectRepository",
+    "LocalProjectRepository",
+    "InMemoryProjectRepository",
+    "ProjectSummary",
+    "ProjectRepositoryError",
+    "ProjectNotFoundError",
 ]

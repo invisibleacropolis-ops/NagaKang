@@ -1,0 +1,19 @@
+%% Controller routing and mapping surface
+flowchart LR
+    Controllers[MIDI / OSC Controllers]
+    Discovery[Device Discovery]
+    Mapper[Controller Mapper]
+    Profiles[Profile Library]
+    Sequencer[Sequencer Commands]
+    Instrument[Instrument Parameters]
+    Feedback[Visual / Haptic Feedback]
+
+    Controllers --> Discovery
+    Discovery --> Mapper
+    Mapper --> Profiles
+    Profiles --> Mapper
+    Mapper --> Sequencer
+    Mapper --> Instrument
+    Sequencer --> Feedback
+    Instrument --> Feedback
+    Feedback --> Controllers

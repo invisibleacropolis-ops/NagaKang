@@ -128,7 +128,12 @@ class ModuleGraph:
 
 
 class AudioEngine:
-    def __init__(self, settings: Optional[AudioSettings] = None) -> None:
+    def __init__(
+        self,
+        settings: Optional[AudioSettings] = None,
+        *,
+        processing_overhead: float = 0.0,
+    ) -> None:
         self.settings = settings or AudioSettings()
         self.dispatcher = EventDispatcher()
         self.graph = ModuleGraph(self.settings)
@@ -137,6 +142,7 @@ class AudioEngine:
         self._thread: Optional[threading.Thread] = None
         self._automation_events: List[AutomationEvent] = []
         self._automation_lock = threading.Lock()
+        self.processing_overhead = processing_overhead
 
     def start(self) -> None:
         if self._running.is_set():
@@ -184,6 +190,32 @@ class AudioEngine:
             buffers.append(self._on_audio_callback(frames))
             remaining -= frames
         return np.vstack(buffers)
+
+    def run_stress_test(
+        self, duration_seconds: float, *, processing_overhead: Optional[float] = None
+    ) -> AudioMetrics:
+        """Execute an offline run while simulating callback pressure.
+
+        Args:
+            duration_seconds: Total duration to render offline.
+            processing_overhead: Optional override for artificial per-callback
+                sleep duration used to emulate heavy DSP load. When omitted the
+                instance-level ``processing_overhead`` value is reused.
+
+        Returns:
+            A reference to :class:`AudioMetrics` capturing underruns and
+            callback durations observed during the run. Metrics are cumulative
+            so callers may inspect deltas relative to prior snapshots.
+        """
+
+        previous = self.processing_overhead
+        try:
+            if processing_overhead is not None:
+                self.processing_overhead = processing_overhead
+            self.render_offline(duration_seconds)
+            return self.metrics
+        finally:
+            self.processing_overhead = previous
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -246,6 +278,8 @@ class AudioEngine:
 
         start_time = time.perf_counter()
         buffer = self.graph.render(frames)
+        if self.processing_overhead > 0.0:
+            time.sleep(self.processing_overhead)
         duration = time.perf_counter() - start_time
 
         if outdata is not None:

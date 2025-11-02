@@ -1,0 +1,23 @@
+%% Audio engine failure-mode overview
+flowchart TD
+    subgraph Monitoring
+        Metrics[Audio Metrics]
+        Alerts[Alert Dispatcher]
+    end
+
+    subgraph Callback[Audio Callback]
+        Render[Render Module Graph]
+        Sleep[Simulated Load]
+    end
+
+    Dispatcher[Event Dispatcher]
+    Sequencer[Sequencer Thread]
+    Recovery[Recovery Actions]
+
+    Sequencer -->|Events| Dispatcher
+    Dispatcher --> Render
+    Render --> Sleep
+    Sleep --> Metrics
+    Metrics -->|Underrun Threshold| Alerts
+    Alerts --> Recovery
+    Recovery -->|Adjust Block Size / Notify UI| Sequencer
