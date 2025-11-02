@@ -54,6 +54,29 @@ NagaKang is a next-generation modular tracker workstation that empowers musician
 - **Maintainability:** Modular codebase with documented APIs, automated testing, and CI/CD pipelines.
 - **Accessibility:** Color-blind friendly themes, keyboard navigation, screen reader hints, and adjustable UI scaling.
 
+### Accessibility Expansion
+To align with WCAG 2.2 AA guidelines and ensure parity across desktop and tablet form factors, the following detailed requirements refine the accessibility commitment above:
+
+1. **Perceivable Interfaces**
+   - Provide high-contrast themes (minimum 4.5:1) and support dynamic switching between dark/light palettes.
+   - Ensure all critical UI controls include textual labels or accessible names surfaced to assistive technologies.
+   - Offer configurable text scaling (125%, 150%, 200%) without truncating layout-critical controls.
+
+2. **Operable Controls**
+   - Guarantee full keyboard access to tracker editing, transport controls, and mixer functions with visible focus indicators.
+   - Support assistive pointer alternatives (switch devices, stylus) by maintaining minimum 12 mm touch targets and spacing.
+   - Provide transport and playback shortcuts with customizable mappings for users relying on adaptive devices.
+
+3. **Understandable Feedback**
+   - Surface error states and long-running operations through both visual (status banners) and auditory cues (optional chimes).
+   - Maintain consistent terminology between tooltips, tutorials, and automation labels to reduce cognitive load.
+   - Include onboarding checklists that highlight available accessibility options during first-run experiences.
+
+4. **Robust Assistive Technology Support**
+   - Expose semantic roles and state changes of UI widgets to screen readers via Kivy's accessibility hooks or platform bridges.
+   - Document recommended settings for popular screen readers (NVDA, VoiceOver) and test critical workflows in each.
+   - Provide extensible localization files that support translation of labels, hints, and documentation for global audiences.
+
 ## Product Requirements Document (PRD) Summary
 ### Objectives
 Deliver an MVP that demonstrates the combined tracker and modular synthesis workflow while establishing a foundation for advanced audio experimentation.
