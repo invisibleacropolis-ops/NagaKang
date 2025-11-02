@@ -7,7 +7,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_ux_flows.md` – Narrative UX flows, gesture considerations, and wireframe roadmap.
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
-- `docs/assets/` – (Planned) Repository for exported wireframes, diagrams, and architecture visuals referenced across docs.
+- `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (see `docs/step2_architecture_diagrams.md`) and future exported visuals.
 - `README.md` – Comprehensive development plan overview and onboarding context.
 - `EngineerLog.md` – Session-by-session progress tracker, completion metrics, and TODOs.
 
@@ -33,3 +33,6 @@ This index formalizes how project documentation is organized so contributors can
    - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10.
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
+
+## Update History
+- 2025-11-02 – Added architecture diagram assets directory details and Step 2 references.

@@ -1,0 +1,39 @@
+%% NagaKang System Component Overview
+flowchart TD
+    subgraph Client[Client Layer]
+        GUI[Kivy Multi-touch GUI]
+        Controllers[MIDI/OSC Controllers]
+    end
+
+    subgraph AppCore[Application Core]
+        Sequencer[Sequencer & Pattern Engine]
+        NodeBuilder[Node-based Instrument Builder]
+        Mixer[Mixer & Routing]
+        ProjectState[State & Persistence]
+    end
+
+    subgraph AudioEngine[Real-time Audio Engine]
+        Dispatcher[Event Dispatcher]
+        ModuleGraph[Module Graph]
+        DSP[DSP Modules]
+    end
+
+    Storage[(Project Files / Assets)]
+    ExternalIO[(External Services \n Plugins, Sample Libraries)]
+
+    GUI --> Sequencer
+    GUI --> NodeBuilder
+    GUI --> Mixer
+    Controllers -->|MIDI/OSC| Dispatcher
+    Sequencer -->|Events| Dispatcher
+    Dispatcher --> ModuleGraph
+    ModuleGraph --> DSP
+    DSP -->|Audio Buffers| Mixer
+    Mixer -->|Rendered Audio| Client
+    ProjectState --> Storage
+    ProjectState --> Sequencer
+    ProjectState --> NodeBuilder
+    ProjectState --> Mixer
+    Storage -->|Load/Save| ProjectState
+    ExternalIO -->|Import/Export| ProjectState
+    ExternalIO -->|Controller Mapping| Controllers
