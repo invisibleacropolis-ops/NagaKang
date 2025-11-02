@@ -7,8 +7,8 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_ux_flows.md` – Narrative UX flows, gesture considerations, and wireframe roadmap.
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
-- `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (see `docs/step2_architecture_diagrams.md`) and future exported visuals.
-- `src/domain/` – Production-ready data models and persistence helpers superseding the prototypes per Step 2 roadmap.
+- `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
+- `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.
 - `.github/workflows/ci.yml` – Continuous integration pipeline invoking Poetry, Ruff, Mypy, and Pytest for baseline quality gates.
 - `pyproject.toml` – Poetry configuration defining dependencies, lint/type-check tooling, and pytest defaults.
 - `README.md` – Comprehensive development plan overview and onboarding context.
@@ -40,3 +40,4 @@ Following these conventions keeps the documentation system coherent as we progre
 ## Update History
 - 2025-11-02 – Added architecture diagram assets directory details and Step 2 references.
 - 2025-11-05 – Documented `src/domain/`, Poetry configuration, and CI workflow additions from Step 2 tooling tasks.
+- 2025-11-09 – Added repository abstractions, stress-test automation references, and expanded diagram index for Step 2 instrumentation work.

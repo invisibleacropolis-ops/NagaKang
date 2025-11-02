@@ -84,14 +84,21 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-1. **Finalize audio engine resilience work (Remaining ~40%)**
-   - Extend the enriched metrics and automation hooks added in `prototypes/audio_engine_skeleton.py` with underrun stress tests and offline render validations against golden files.
-2. **Broaden domain persistence adapters (Remaining ~35%)**
-   - Layer repository abstractions and storage backends on top of the new `src/domain` package to support cloud sync scenarios outlined in the roadmap.
+### Step 2 Progress Update – Session 4
+
+- Implemented configurable processing overhead and a `run_stress_test` helper inside `prototypes/audio_engine_skeleton.py`, enabling deterministic underrun simulation for CI. Automated pytest coverage now asserts underrun counters and automation timing behaviour, providing the empirical safety net promised in Plan §9.
+- Added `domain.repository` containing a repository protocol, filesystem implementation, and in-memory stub to pave the way for local/cloud persistence strategies from Plan §8. Tests validate round-trips, enumeration, and error handling to guard against data loss regressions.
+
+### Revised Next Actions
+
+1. **Finalize audio engine resilience work (Remaining ~20%)**
+   - Incorporate offline render golden files and extend stress suites to cover multi-channel automation envelopes.
+2. **Broaden domain persistence adapters (Remaining ~15%)**
+   - Prototype cloud-backed adapters (e.g., S3, WebDAV) building on the repository protocol and document sync/conflict policies.
 3. **Document CI & tooling conventions (Remaining ~10%)**
    - Capture the new `pyproject.toml`/Poetry workflow and GitHub Actions pipeline inside `docs/documentation_structure.md` for contributor onboarding.
-4. **Generate additional diagrams (Remaining ~40%)**
-   - Author failure-mode and controller-routing diagrams to complement the current architecture visuals.
+4. **Generate additional diagrams (Remaining ~10%)**
+   - Maintain and iterate on the new failure-mode and controller-routing diagrams introduced this session as prototype fidelity increases.
 
 These decisions align the project with the Comprehensive Development Plan and unblock implementation work for Steps 3–5.
 

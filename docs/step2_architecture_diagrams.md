@@ -77,3 +77,60 @@ sequenceDiagram
 
 - Export these Mermaid diagrams to SVG/PNG assets when preparing external documentation bundles.
 - Extend the sequence diagram set with failure scenarios (buffer underruns, module hot-swap) as prototypes mature.
+- Keep controller routing visuals aligned with hardware mapping discoveries during Plan §5 prototyping.
+
+## Audio Engine Failure Modes
+
+```mermaid
+%%{init: {"theme": "neutral"}}%%
+flowchart TD
+    subgraph Monitoring
+        Metrics[Audio Metrics]
+        Alerts[Alert Dispatcher]
+    end
+
+    subgraph Callback[Audio Callback]
+        Render[Render Module Graph]
+        Sleep[Simulated Load]
+    end
+
+    Dispatcher[Event Dispatcher]
+    Sequencer[Sequencer Thread]
+    Recovery[Recovery Actions]
+
+    Sequencer -->|Events| Dispatcher
+    Dispatcher --> Render
+    Render --> Sleep
+    Sleep --> Metrics
+    Metrics -->|Underrun Threshold| Alerts
+    Alerts --> Recovery
+    Recovery -->|Adjust Block Size / Notify UI| Sequencer
+```
+
+*Source:* `docs/assets/audio_failure_modes.mmd`
+
+## Controller Routing Overview
+
+```mermaid
+%%{init: {"theme": "neutral"}}%%
+flowchart LR
+    Controllers[MIDI / OSC Controllers]
+    Discovery[Device Discovery]
+    Mapper[Controller Mapper]
+    Profiles[Profile Library]
+    Sequencer[Sequencer Commands]
+    Instrument[Instrument Parameters]
+    Feedback[Visual / Haptic Feedback]
+
+    Controllers --> Discovery
+    Discovery --> Mapper
+    Mapper --> Profiles
+    Profiles --> Mapper
+    Mapper --> Sequencer
+    Mapper --> Instrument
+    Sequencer --> Feedback
+    Instrument --> Feedback
+    Feedback --> Controllers
+```
+
+*Source:* `docs/assets/controller_routing.mmd`
