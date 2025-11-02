@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import time
 from pathlib import Path
 from typing import Dict, Iterable, Protocol
 
 from .models import Project
-from .persistence import ProjectFileAdapter
+from .persistence import ProjectFileAdapter, ProjectSerializer
 
 
 class ProjectRepositoryError(Exception):
@@ -127,4 +128,84 @@ class InMemoryProjectRepository(ProjectRepository):
                 name=project.metadata.name,
                 updated_at=project.metadata.updated_at,
                 location="in-memory",
+            )
+
+
+class MockCloudProjectRepository(ProjectRepository):
+    """Simulated cloud repository with naive sync + conflict detection.
+
+    The adapter serializes payloads to a local cache so integration code can
+    exercise round-trips without needing credentials. A small amount of
+    artificial latency can be configured to mimic remote calls during tests.
+    """
+
+    def __init__(
+        self,
+        adapter: ProjectFileAdapter,
+        *,
+        bucket: str = "naga-cloud",
+        extension: str = ".json",
+        network_latency: float = 0.0,
+    ) -> None:
+        self._adapter = adapter
+        self._bucket = bucket
+        self._extension = extension
+        self._network_latency = network_latency
+        self._objects: Dict[str, Dict[str, object]] = {}
+        self._revisions: Dict[str, datetime] = {}
+
+    def _simulate_latency(self) -> None:
+        if self._network_latency > 0.0:
+            time.sleep(self._network_latency)
+
+    def _path_for(self, identifier: str) -> Path:
+        return self._adapter.base_path / f"{identifier}{self._extension}"
+
+    def save(self, project: Project) -> ProjectSummary:
+        previous_revision = self._revisions.get(project.metadata.id)
+        if previous_revision and project.metadata.updated_at < previous_revision:
+            raise ProjectRepositoryError(
+                "Stale project metadata detected; update local state before saving"
+            )
+        self._simulate_latency()
+        payload = ProjectSerializer.to_dict(project)
+        self._objects[project.metadata.id] = payload
+        self._revisions[project.metadata.id] = project.metadata.updated_at
+        self._adapter.save(project, f"{project.metadata.id}{self._extension}")
+        return ProjectSummary(
+            identifier=project.metadata.id,
+            name=project.metadata.name,
+            updated_at=project.metadata.updated_at,
+            location=f"cloud://{self._bucket}/{project.metadata.id}",
+        )
+
+    def load(self, identifier: str) -> Project:
+        self._simulate_latency()
+        try:
+            payload = self._objects[identifier]
+        except KeyError as exc:
+            raise ProjectNotFoundError(f"Project {identifier!r} not found in cloud store") from exc
+        project = ProjectSerializer.from_dict(payload)  # type: ignore[arg-type]
+        self._adapter.save(project, f"{identifier}{self._extension}")
+        return project
+
+    def delete(self, identifier: str) -> None:
+        self._simulate_latency()
+        if identifier not in self._objects:
+            raise ProjectNotFoundError(f"Project {identifier!r} not found in cloud store")
+        del self._objects[identifier]
+        self._revisions.pop(identifier, None)
+        cache_path = self._path_for(identifier)
+        if cache_path.exists():
+            cache_path.unlink()
+
+    def list(self) -> Iterable[ProjectSummary]:
+        self._simulate_latency()
+        for identifier, payload in sorted(self._objects.items()):
+            project = ProjectSerializer.from_dict(payload)  # type: ignore[arg-type]
+            yield ProjectSummary(
+                identifier=identifier,
+                name=project.metadata.name,
+                updated_at=project.metadata.updated_at,
+                location=f"cloud://{self._bucket}/{identifier}",
             )
