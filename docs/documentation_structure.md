@@ -37,7 +37,18 @@ This index formalizes how project documentation is organized so contributors can
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
 
+## CI & Tooling Runbook
+These commands reflect the expectations enforced by the GitHub Actions pipeline and should be executed via Poetry:
+
+1. `poetry install --sync` – Install all project dependencies, including optional audio tooling such as NumPy.
+2. `poetry run ruff check` – Lint the codebase to satisfy style and static analysis policies outlined in Plan §9.
+3. `poetry run mypy` – Type-check the `src/` and `prototypes/` packages.
+4. `poetry run pytest` – Execute the full test suite. Golden render fixtures live under `tests/fixtures/`; use `pytest -k audio_engine` to focus on the stress harness when iterating on DSP modules.
+
+Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to share with the broader engineering team.
+
 ## Update History
 - 2025-11-02 – Added architecture diagram assets directory details and Step 2 references.
 - 2025-11-05 – Documented `src/domain/`, Poetry configuration, and CI workflow additions from Step 2 tooling tasks.
 - 2025-11-09 – Added repository abstractions, stress-test automation references, and expanded diagram index for Step 2 instrumentation work.
+- 2025-11-12 – Captured CI runbook commands and referenced golden audio fixtures plus mock cloud repository guidance.

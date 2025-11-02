@@ -84,23 +84,23 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-### Step 2 Progress Update – Session 4
+### Step 2 Progress Update – Session 5
 
-- Implemented configurable processing overhead and a `run_stress_test` helper inside `prototypes/audio_engine_skeleton.py`, enabling deterministic underrun simulation for CI. Automated pytest coverage now asserts underrun counters and automation timing behaviour, providing the empirical safety net promised in Plan §9.
-- Added `domain.repository` containing a repository protocol, filesystem implementation, and in-memory stub to pave the way for local/cloud persistence strategies from Plan §8. Tests validate round-trips, enumeration, and error handling to guard against data loss regressions.
+- Captured deterministic offline renders for the audio engine skeleton (Plan §3, §9) by generating golden fixtures and augmenting the pytest suite with multi-stage automation stress cases. The new assertions confirm <1e-3 RMS noise during muted segments and >0.3 RMS signal levels during active phases, establishing regression thresholds for underrun monitoring.
+- Introduced `MockCloudProjectRepository` to simulate S3/WebDAV style backends while enforcing stale-write detection aligned with the persistence strategy in Plan §2/§8. Local caches remain hydrated via `ProjectFileAdapter` to mimic hybrid sync workflows.
+- Documented CI and tooling conventions—including Poetry install/run commands and GitHub Actions expectations—in the documentation structure guide so external contributors can reliably reproduce QA steps.
+- Outlined Step 3 entry criteria and backlog seeds (Plan §3) focused on module framework scaffolding, modulation services, and sequencing hooks now that persistence and instrumentation scaffolds are in place.
 
 ### Revised Next Actions
 
-1. **Finalize audio engine resilience work (Remaining ~20%)**
-   - Incorporate offline render golden files and extend stress suites to cover multi-channel automation envelopes.
-2. **Broaden domain persistence adapters (Remaining ~15%)**
-   - Prototype cloud-backed adapters (e.g., S3, WebDAV) building on the repository protocol and document sync/conflict policies.
-3. **Document CI & tooling conventions (Remaining ~10%)**
-   - Capture the new `pyproject.toml`/Poetry workflow and GitHub Actions pipeline inside `docs/documentation_structure.md` for contributor onboarding.
-4. **Generate additional diagrams (Remaining ~10%)**
-   - Maintain and iterate on the new failure-mode and controller-routing diagrams introduced this session as prototype fidelity increases.
+1. **Audio Engine Benchmarks (Remaining ~10% of Step 2 instrumentation)**
+   - Extend the stress harness with CPU budget sampling and capture benchmark tables under `docs/qa/` once buffer underrun targets are established.
+2. **Cloud Sync Strategy Narrative (Remaining ~10% of persistence task)**
+   - Expand on eventual consistency trade-offs (conflict resolution, merge policies) and surface integration notes for real providers (AWS S3, WebDAV) using the new mock adapter as reference.
+3. **Diagram Maintenance (Remaining ~10%)**
+   - Refresh failure-mode/controller-routing diagrams with remote persistence pathways and audio benchmark data flows before transitioning to Step 3 builds.
 
-These decisions align the project with the Comprehensive Development Plan and unblock implementation work for Steps 3–5.
+These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 
 ## 10. Prototype Artifacts
 - `prototypes/audio_engine_skeleton.py`: runnable scaffold featuring underrun metrics, parameter automation, and offline rendering helpers with optional `sounddevice` integration.
