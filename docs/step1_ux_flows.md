@@ -80,6 +80,17 @@ The following flows describe critical end-to-end journeys for the NagaKang MVP. 
 - Ensure accessibility features (high-contrast theme toggle, font scaling) are present in prototypes.
 - Document empty states, error messages, and loading indicators for asset-heavy operations.
 
+## Wireframe & Diagram Roadmap
+To satisfy the remaining 5% gap identified in the Engineer Log, we have committed to the following visualization deliverables and tooling choices:
+
+- **Tooling:** Use Figma for collaborative low-fidelity wireframes and FigJam for interaction diagrams, enabling easy sharing with stakeholders.
+- **Tracker Flow Artifacts:** Create three wireframes covering empty state, populated pattern editing, and automation lane editing; annotate gesture zones and keyboard shortcuts.
+- **Instrument Builder Flow Artifacts:** Produce a node canvas layout map plus a modulation routing diagram that highlights signal direction and feedback safeguards.
+- **Mixer Flow Artifacts:** Deliver a responsive layout comparison (desktop vs. tablet) along with a send/return routing schematic.
+- **Review Cadence:** Schedule weekly async reviews by exporting frames to `docs/assets/wireframes/` once generated; cross-reference them in future documentation updates.
+
+These commitments finalize the planning requirements for Step 1 flows while paving the way for visual prototyping in subsequent sessions.
+
 ## Artifacts to Produce in Later Steps
 - Low-fidelity wireframes covering each flow.
 - Interactive prototype demonstrating pattern editing and node manipulation.
