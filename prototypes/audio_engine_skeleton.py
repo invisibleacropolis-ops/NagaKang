@@ -1,4 +1,4 @@
-"""Prototype audio engine skeleton for Step 2 validation.
+"""Prototype audio engine skeleton for Step 2 validation with richer metrics.
 
 This module focuses on mapping the architecture decisions from
 `docs/step2_architecture_tech_choices.md` into executable scaffolding.
@@ -18,12 +18,13 @@ tests.
 from __future__ import annotations
 
 import argparse
+import heapq
 import logging
 import queue
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,33 @@ class AudioSettings:
     test_tone_hz: Optional[float] = None
 
 
+@dataclass(order=True)
+class AutomationEvent:
+    """Deferred parameter change executed on a buffer boundary."""
+
+    time_seconds: float
+    parameter: str = field(compare=False)
+    value: float = field(compare=False)
+
+
 @dataclass
 class AudioMetrics:
     processed_blocks: int = 0
     underruns: int = 0
     callbacks: int = 0
     start_time: float = field(default_factory=time.perf_counter)
+    engine_time: float = 0.0
+    last_callback_duration: float = 0.0
+    max_callback_duration: float = 0.0
 
     @property
     def elapsed(self) -> float:
         return time.perf_counter() - self.start_time
+
+    def record_callback_duration(self, duration: float) -> None:
+        self.last_callback_duration = duration
+        if duration > self.max_callback_duration:
+            self.max_callback_duration = duration
 
 
 class EventDispatcher:
@@ -84,17 +102,25 @@ class ModuleGraph:
     def __init__(self, settings: AudioSettings) -> None:
         self.settings = settings
         self.phase = 0.0
+        self.parameters: dict[str, Optional[float]] = {"test_tone_hz": settings.test_tone_hz}
+
+    def set_parameter(self, name: str, value: Optional[float]) -> None:
+        logger.debug("Setting parameter %s=%s", name, value)
+        self.parameters[name] = value
+
+    def get_parameter(self, name: str) -> Optional[float]:
+        return self.parameters.get(name)
 
     def render(self, frames: int) -> "np.ndarray":
         if np is None:
             raise RuntimeError("NumPy is required for DSP rendering in this prototype.")
 
-        if self.settings.test_tone_hz is None:
+        freq = self.get_parameter("test_tone_hz")
+        if freq is None:
             return np.zeros((frames, self.settings.channels), dtype=np.float32)
 
         t = np.arange(frames, dtype=np.float32)
-        freq = float(self.settings.test_tone_hz)
-        increment = 2 * np.pi * freq / self.settings.sample_rate
+        increment = 2 * np.pi * float(freq) / self.settings.sample_rate
         phase = self.phase + t * increment
         self.phase = float((phase[-1] + increment) % (2 * np.pi))
         tone = np.sin(phase, dtype=np.float32)
@@ -109,6 +135,8 @@ class AudioEngine:
         self.metrics = AudioMetrics()
         self._running = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._automation_events: List[AutomationEvent] = []
+        self._automation_lock = threading.Lock()
 
     def start(self) -> None:
         if self._running.is_set():
@@ -125,7 +153,37 @@ class AudioEngine:
         self._running.clear()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
-        logger.debug("Audio engine stopped after %s seconds", self.metrics.elapsed)
+        logger.debug(
+            "Audio engine stopped after %.3f seconds (processed_blocks=%s)",
+            self.metrics.elapsed,
+            self.metrics.processed_blocks,
+        )
+
+    def schedule_parameter_automation(
+        self, parameter: str, value: Optional[float], time_seconds: float
+    ) -> None:
+        """Schedule a parameter change to align with the realtime timeline."""
+
+        with self._automation_lock:
+            heapq.heappush(self._automation_events, AutomationEvent(time_seconds, parameter, value))
+
+    def render_offline(self, duration_seconds: float) -> "np.ndarray":
+        """Render buffers without starting realtime threads for CI usage."""
+
+        if np is None:
+            raise RuntimeError("NumPy is required for offline rendering.")
+
+        total_frames = max(0, int(round(duration_seconds * self.settings.sample_rate)))
+        if total_frames == 0:
+            return np.zeros((0, self.settings.channels), dtype=np.float32)
+
+        buffers = []
+        remaining = total_frames
+        while remaining > 0:
+            frames = min(remaining, self.settings.block_size)
+            buffers.append(self._on_audio_callback(frames))
+            remaining -= frames
+        return np.vstack(buffers)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -155,6 +213,7 @@ class AudioEngine:
             buffer = None
             if np is not None:
                 buffer = self._on_audio_callback(self.settings.block_size)
+                logger.debug("Simulated buffer shape: %s", None if buffer is None else buffer.shape)
             else:
                 self.metrics.underruns += 1
                 logger.warning("NumPy missing; unable to render buffer")
@@ -168,15 +227,36 @@ class AudioEngine:
             stream.stop()
             stream.close()
 
+    def _drain_automation_events(self, start: float, end: float) -> None:
+        with self._automation_lock:
+            while self._automation_events and self._automation_events[0].time_seconds <= end:
+                event = heapq.heappop(self._automation_events)
+                if event.time_seconds < start:
+                    logger.debug("Applying late automation event %s at %s", event, start)
+                self.graph.set_parameter(event.parameter, event.value)
+
     def _on_audio_callback(self, frames: int, outdata=None):
         self.dispatcher.poll()
         if np is None:
             return None
+
+        block_duration = frames / self.settings.sample_rate
+        start_engine_time = self.metrics.engine_time
+        self._drain_automation_events(start_engine_time, start_engine_time + block_duration)
+
+        start_time = time.perf_counter()
         buffer = self.graph.render(frames)
+        duration = time.perf_counter() - start_time
+
         if outdata is not None:
             outdata[:] = buffer
+
+        self.metrics.record_callback_duration(duration)
+        if duration > block_duration:
+            self.metrics.underruns += 1
         self.metrics.processed_blocks += 1
         self.metrics.callbacks += 1
+        self.metrics.engine_time += block_duration
         return buffer
 
 
@@ -202,11 +282,12 @@ def main() -> None:
     time.sleep(max(0.0, args.duration))
     engine.stop()
     logger.info(
-        "Processed %s blocks in %.3f seconds (callbacks=%s, underruns=%s)",
+        "Processed %s blocks in %.3f seconds (callbacks=%s, underruns=%s, max_cb=%.4fs)",
         engine.metrics.processed_blocks,
         engine.metrics.elapsed,
         engine.metrics.callbacks,
         engine.metrics.underruns,
+        engine.metrics.max_callback_duration,
     )
 
 
