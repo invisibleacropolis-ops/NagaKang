@@ -84,14 +84,20 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-1. Validate the audio engine skeleton (`prototypes/audio_engine_skeleton.py`) against additional backends and introduce buffer underrun instrumentation.
-2. Expand the `prototypes/domain_models.py` schemas into a production-ready package (e.g., `src/domain/`) with persistence adapters.
-3. Establish `poetry` configuration and baseline CI workflow (lint + docs build).
-4. Generate additional diagrams (error handling, controller input flow) building on `docs/step2_architecture_diagrams.md`.
+1. **Finalize audio engine resilience work (Remaining ~40%)**
+   - Extend the enriched metrics and automation hooks added in `prototypes/audio_engine_skeleton.py` with underrun stress tests and offline render validations against golden files.
+2. **Broaden domain persistence adapters (Remaining ~35%)**
+   - Layer repository abstractions and storage backends on top of the new `src/domain` package to support cloud sync scenarios outlined in the roadmap.
+3. **Document CI & tooling conventions (Remaining ~10%)**
+   - Capture the new `pyproject.toml`/Poetry workflow and GitHub Actions pipeline inside `docs/documentation_structure.md` for contributor onboarding.
+4. **Generate additional diagrams (Remaining ~40%)**
+   - Author failure-mode and controller-routing diagrams to complement the current architecture visuals.
 
 These decisions align the project with the Comprehensive Development Plan and unblock implementation work for Steps 3–5.
 
 ## 10. Prototype Artifacts
-- `prototypes/audio_engine_skeleton.py`: runnable scaffold that exercises the dispatcher-module graph pipeline with optional `sounddevice` integration.
-- `prototypes/domain_models.py`: `pydantic`-based project, pattern, and instrument models accompanied by validation-focused unit tests.
+- `prototypes/audio_engine_skeleton.py`: runnable scaffold featuring underrun metrics, parameter automation, and offline rendering helpers with optional `sounddevice` integration.
+- `src/domain/`: production-ready `pydantic` models plus JSON persistence helpers superseding the prototype module.
+- `prototypes/domain_models.py`: compatibility shim re-exporting the production models to keep legacy imports functional.
 - `docs/step2_architecture_diagrams.md`: Mermaid component and sequence diagrams stored alongside source files in `docs/assets/`.
+- `pyproject.toml` & `.github/workflows/ci.yml`: Poetry configuration and CI pipeline executing lint, type-check, and test stages per Plan §9.

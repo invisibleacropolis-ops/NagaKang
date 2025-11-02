@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from prototypes.domain_models import (
+from domain.models import (
     AutomationPoint,
     InstrumentDefinition,
     InstrumentModule,
@@ -67,3 +67,16 @@ def test_touch_updates_timestamp():
     project.touch()
     assert project.metadata.updated_at >= before
     assert isinstance(project.metadata.updated_at, datetime)
+
+
+def test_total_duration_beats():
+    project = Project(metadata=ProjectMetadata(id="p", name="P"))
+    pattern = Pattern(
+        id="p1",
+        name="One",
+        length_steps=8,
+        steps=[PatternStep(note=60) for _ in range(8)],
+    )
+    project.add_pattern(pattern)
+    project.append_to_song(pattern.id)
+    assert pytest.approx(project.total_duration_beats()) == 2.0

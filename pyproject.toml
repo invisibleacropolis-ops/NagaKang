@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "nagakang"
+version = "0.1.0"
+description = "Audio workstation planning prototypes and tooling"
+authors = ["Project Automation <automation@example.com>"]
+packages = [{ include = "domain", from = "src" }]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.7.0"
+numpy = "^1.26.0"
+sounddevice = { version = "^0.4.6", optional = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+ruff = "^0.4.0"
+mypy = "^1.8.0"
+
+[tool.poetry.extras]
+audio = ["sounddevice"]
+
+[build-system]
+requires = ["poetry-core>=1.7.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "--maxfail=1 --disable-warnings"
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "UP", "B"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+strict_optional = true
+warn_unused_configs = true
