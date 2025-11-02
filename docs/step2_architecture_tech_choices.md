@@ -9,6 +9,8 @@ This document operationalizes the Comprehensive Development Plan (see README §2
 4. **Cross-Platform Compatibility** – Favor portable libraries and isolate platform-specific code (audio drivers, filesystem) behind adapter interfaces.
 
 ## 2. Layered System Overview
+The layered overview is visualized in `docs/step2_architecture_diagrams.md`, which captures the component relationships and audio callback sequencing defined here.
+
 1. **Audio Engine Layer**
    - Real-time audio callback hosted via `sounddevice` for prototyping; target migration path to PortAudio or custom C++ host for production.
    - DSP graph executed in block-sized chunks with double-buffering to minimize cache misses.
@@ -82,9 +84,14 @@ This document operationalizes the Comprehensive Development Plan (see README §2
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-1. Prototype minimal audio engine loop using `sounddevice` and placeholder oscillator modules.
-2. Draft `pydantic` models for project, pattern, and instrument schemas in a new `src/domain/` package.
+1. Validate the audio engine skeleton (`prototypes/audio_engine_skeleton.py`) against additional backends and introduce buffer underrun instrumentation.
+2. Expand the `prototypes/domain_models.py` schemas into a production-ready package (e.g., `src/domain/`) with persistence adapters.
 3. Establish `poetry` configuration and baseline CI workflow (lint + docs build).
-4. Begin drafting architecture diagrams (component and sequence) for inclusion under `docs/assets/` per documentation guide.
+4. Generate additional diagrams (error handling, controller input flow) building on `docs/step2_architecture_diagrams.md`.
 
 These decisions align the project with the Comprehensive Development Plan and unblock implementation work for Steps 3–5.
+
+## 10. Prototype Artifacts
+- `prototypes/audio_engine_skeleton.py`: runnable scaffold that exercises the dispatcher-module graph pipeline with optional `sounddevice` integration.
+- `prototypes/domain_models.py`: `pydantic`-based project, pattern, and instrument models accompanied by validation-focused unit tests.
+- `docs/step2_architecture_diagrams.md`: Mermaid component and sequence diagrams stored alongside source files in `docs/assets/`.
