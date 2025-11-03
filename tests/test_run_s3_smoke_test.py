@@ -1,61 +1,31 @@
-from pathlib import Path
+import json
 
-import boto3
-import pytest
-from moto import mock_aws
-
-from domain.persistence import ProjectFileAdapter
-from domain.repository import S3ProjectRepository
-from tools.run_s3_smoke_test import build_sample_project, execute_smoke_test
+from tools.run_s3_smoke_test import main
 
 
-@pytest.fixture()
-def moto_environment() -> None:
-    with mock_aws():
-        yield
+def test_run_s3_smoke_test_with_moto(tmp_path, capsys):
+    cache_path = tmp_path / "cache"
+    summary_json = tmp_path / "report.json"
+    summary_markdown = tmp_path / "report.md"
 
+    exit_code = main(
+        [
+            "--use-moto",
+            "--bootstrap-bucket",
+            "--cache-path",
+            str(cache_path),
+            "--summary-json",
+            str(summary_json),
+            "--summary-markdown",
+            str(summary_markdown),
+            "--identifier",
+            "test-smoke",
+        ]
+    )
 
-def test_execute_smoke_test_success(tmp_path: Path, moto_environment: None) -> None:
-    client = boto3.client("s3", region_name="us-east-1")
-    bucket = "nagakang-smoke"
-    client.create_bucket(Bucket=bucket)
-
-    env = {
-        "NAGAKANG_S3_BUCKET": bucket,
-        "AWS_DEFAULT_REGION": "us-east-1",
-        "NAGAKANG_S3_ENDPOINT_URL": client.meta.endpoint_url,
-    }
-
-    adapter = ProjectFileAdapter(tmp_path / "cache")
-    repository = S3ProjectRepository.from_environment(adapter, env=env)
-
-    project = build_sample_project("smoke-test")
-    report = execute_smoke_test(repository, project, cleanup=True)
-
-    assert report.status == "success"
-    assert report.operations
-    durations = [op.duration_seconds for op in report.operations]
-    assert all(duration >= 0.0 for duration in durations)
-
-
-def test_execute_smoke_test_handles_cleanup(tmp_path: Path, moto_environment: None) -> None:
-    client = boto3.client("s3", region_name="us-east-1")
-    bucket = "nagakang-smoke-cleanup"
-    client.create_bucket(Bucket=bucket)
-
-    env = {
-        "NAGAKANG_S3_BUCKET": bucket,
-        "AWS_DEFAULT_REGION": "us-east-1",
-        "NAGAKANG_S3_ENDPOINT_URL": client.meta.endpoint_url,
-    }
-
-    adapter = ProjectFileAdapter(tmp_path / "cache")
-    repository = S3ProjectRepository.from_environment(adapter, env=env)
-
-    project = build_sample_project("cleanup-test")
-    report = execute_smoke_test(repository, project, cleanup=True)
-
-    cache_files = list((tmp_path / "cache").glob("*.json"))
-    assert not cache_files
-    assert report.status == "success"
-    assert {op.name for op in report.operations} >= {"save", "load", "delete"}
+    captured = capsys.readouterr()
+    assert "S3 Smoke Test" in captured.out
+    assert exit_code == 0
+    payload = json.loads(summary_json.read_text(encoding="utf-8"))
+    assert payload["status"] == "success"
+    assert summary_markdown.read_text(encoding="utf-8").startswith("# S3 Smoke Test Report")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
 from typing import Iterable, List, Sequence
@@ -52,6 +53,7 @@ def publish_diagrams(
     *,
     dry_run: bool = False,
     expected_version: str | None = None,
+    puppeteer_cache: Path | None = None,
 ) -> List[Path]:
     """Render Mermaid diagrams to SVG using an external renderer command."""
 
@@ -67,8 +69,21 @@ def publish_diagrams(
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
         command = [*renderer, "-i", str(source), "-o", str(destination)]
+        env = None
+        if puppeteer_cache is not None:
+            cache_path = puppeteer_cache
+            cache_path.mkdir(parents=True, exist_ok=True)
+            env = os.environ.copy()
+            env.setdefault("PUPPETEER_CACHE_DIR", str(cache_path))
+            env.setdefault("PUPPETEER_DOWNLOAD_PATH", str(cache_path))
         try:
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(
+                command,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
         except FileNotFoundError as exc:  # pragma: no cover - depends on environment
             raise DiagramPublishError(f"Renderer command not found: {renderer[0]}") from exc
         except subprocess.CalledProcessError as exc:
@@ -115,6 +130,12 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Disable renderer version validation (not recommended outside experiments)",
     )
+    parser.add_argument(
+        "--puppeteer-cache",
+        type=Path,
+        default=None,
+        help="Directory for caching the Puppeteer Chromium download used by Mermaid CLI",
+    )
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
@@ -131,6 +152,7 @@ def main(argv: Iterable[str] | None = None) -> None:
         args.renderer,
         dry_run=args.dry_run,
         expected_version=expected_version,
+        puppeteer_cache=args.puppeteer_cache,
     )
     if args.dry_run:
         for path in outputs:

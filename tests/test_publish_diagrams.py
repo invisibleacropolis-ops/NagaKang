@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -13,26 +14,34 @@ def test_publish_diagrams_invokes_renderer(tmp_path):
     renderer = tmp_path / "renderer.py"
     renderer.write_text(
         """
+import os
 import sys
 from pathlib import Path
 
 args = sys.argv
 source = Path(args[args.index('-i') + 1])
 destination = Path(args[args.index('-o') + 1])
-destination.write_text('rendered:' + source.read_text(encoding='utf-8'), encoding='utf-8')
+cache = os.environ.get('PUPPETEER_CACHE_DIR', '')
+destination.write_text('rendered:' + cache + ':' + source.read_text(encoding='utf-8'), encoding='utf-8')
 """,
         encoding="utf-8",
     )
+
+    cache_dir = tmp_path / "puppeteer-cache"
 
     outputs = publish_diagrams(
         assets,
         tmp_path / "out",
         [sys.executable, str(renderer)],
         expected_version=None,
+        puppeteer_cache=cache_dir,
     )
 
     assert outputs == [tmp_path / "out" / "example.svg"]
     assert outputs[0].read_text(encoding="utf-8").startswith("rendered:")
+    assert cache_dir.exists()
+    rendered_payload = outputs[0].read_text(encoding="utf-8")
+    assert str(cache_dir) in rendered_payload
 
 
 def test_find_mermaid_sources_and_dry_run(tmp_path):
