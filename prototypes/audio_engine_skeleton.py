@@ -65,15 +65,61 @@ class AudioMetrics:
     engine_time: float = 0.0
     last_callback_duration: float = 0.0
     max_callback_duration: float = 0.0
+    _callback_durations: List[float] = field(default_factory=list)
+    _cpu_load_observations: List[float] = field(default_factory=list)
 
     @property
     def elapsed(self) -> float:
         return time.perf_counter() - self.start_time
 
-    def record_callback_duration(self, duration: float) -> None:
+    def record_callback(self, duration: float, block_duration: float) -> None:
+        """Capture timing metadata for a single callback."""
+
         self.last_callback_duration = duration
         if duration > self.max_callback_duration:
             self.max_callback_duration = duration
+        self._callback_durations.append(duration)
+        if block_duration > 0.0:
+            self._cpu_load_observations.append(duration / block_duration)
+
+    @property
+    def average_callback_duration(self) -> float:
+        if not self._callback_durations:
+            return 0.0
+        return float(sum(self._callback_durations) / len(self._callback_durations))
+
+    @property
+    def callback_duration_p95(self) -> float:
+        if not self._callback_durations:
+            return 0.0
+        sorted_values = sorted(self._callback_durations)
+        index = int(round(0.95 * (len(sorted_values) - 1)))
+        return float(sorted_values[index])
+
+    @property
+    def average_cpu_load(self) -> float:
+        if not self._cpu_load_observations:
+            return 0.0
+        return float(sum(self._cpu_load_observations) / len(self._cpu_load_observations))
+
+    @property
+    def max_cpu_load(self) -> float:
+        if not self._cpu_load_observations:
+            return 0.0
+        return float(max(self._cpu_load_observations))
+
+    def snapshot(self) -> dict[str, float]:
+        """Return aggregate metrics useful for benchmark tables."""
+
+        return {
+            "processed_blocks": float(self.processed_blocks),
+            "underruns": float(self.underruns),
+            "callbacks": float(self.callbacks),
+            "avg_callback_ms": self.average_callback_duration * 1_000.0,
+            "p95_callback_ms": self.callback_duration_p95 * 1_000.0,
+            "avg_cpu_load": self.average_cpu_load,
+            "max_cpu_load": self.max_cpu_load,
+        }
 
 
 class EventDispatcher:
@@ -285,7 +331,7 @@ class AudioEngine:
         if outdata is not None:
             outdata[:] = buffer
 
-        self.metrics.record_callback_duration(duration)
+        self.metrics.record_callback(duration, block_duration)
         if duration > block_duration:
             self.metrics.underruns += 1
         self.metrics.processed_blocks += 1

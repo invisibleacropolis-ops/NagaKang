@@ -109,6 +109,8 @@ flowchart TD
 
 *Source:* `docs/assets/audio_failure_modes.mmd`
 
+**Updates this session:** Added benchmark exporter and cloud persistence nodes so underrun telemetry now feeds the QA archive (`docs/qa/`) while recovery routines synchronize state with remote repositories.
+
 ## Controller Routing Overview
 
 ```mermaid
@@ -134,3 +136,5 @@ flowchart LR
 ```
 
 *Source:* `docs/assets/controller_routing.mmd`
+
+**Updates this session:** Extended the mapper view with cloud-synced profile storage and telemetry export lines that push controller performance data into the QA benchmark archive referenced by Plan §9.

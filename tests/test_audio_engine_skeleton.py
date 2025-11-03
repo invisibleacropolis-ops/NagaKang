@@ -76,6 +76,18 @@ def test_stress_test_reports_underruns():
     metrics = engine.run_stress_test(0.01, processing_overhead=0.002)
     assert metrics.underruns > 0
     assert metrics.max_callback_duration >= metrics.last_callback_duration
+    assert metrics.average_cpu_load > 1.0
+    assert metrics.max_cpu_load >= metrics.average_cpu_load
+
+
+def test_metrics_snapshot_contains_latency_and_cpu_insights():
+    engine = AudioEngine(AudioSettings(block_size=64, test_tone_hz=220.0))
+    metrics = engine.run_stress_test(0.02, processing_overhead=0.0003)
+    snapshot = metrics.snapshot()
+    assert snapshot["callbacks"] == pytest.approx(metrics.callbacks)
+    assert snapshot["avg_callback_ms"] > 0.0
+    assert snapshot["p95_callback_ms"] >= snapshot["avg_callback_ms"]
+    assert 0.0 < snapshot["avg_cpu_load"] <= snapshot["max_cpu_load"]
 
 
 def _rms(values: "np.ndarray") -> float:
