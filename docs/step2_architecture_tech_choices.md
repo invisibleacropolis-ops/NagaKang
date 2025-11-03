@@ -92,18 +92,18 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 ## 9. Next Actions
 ### Step 2 Progress Update – Session 7
 
-- Automated the stress harness export pipeline with JSON/CSV emitters driven by `docs/qa/stress_plan.json`, wiring command-line options into `prototypes/audio_engine_skeleton.py` so CI can archive latency evidence per Plan §9.
-- Implemented `S3ProjectRepository` with optimistic concurrency checks and caching to validate the live cloud sync narrative introduced in Plan §2/§8, complete with unit tests exercising failure paths.
-- Added `tools/publish_diagrams.py` to standardize Mermaid-to-SVG exports and updated documentation indices to guide contributors through the publishing workflow ahead of Step 3 diagram refreshes.
+- Automated the stress harness export pipeline with JSON/CSV emitters driven by `docs/qa/stress_plan.json`, wiring command-line options into `prototypes/audio_engine_skeleton.py` so CI can archive latency evidence per Plan §9 and now publishing those artifacts on every workflow run.
+- Implemented `S3ProjectRepository` with optimistic concurrency checks, caching, and a new `from_environment` helper so deployment pipelines can source credentials from environment variables while keeping secrets out of the codebase.
+- Added `tools/publish_diagrams.py` to standardize Mermaid-to-SVG exports and updated documentation indices to guide contributors through the publishing workflow ahead of Step 3 diagram refreshes, with CI now invoking the renderer via Mermaid CLI.
 
 ### Revised Next Actions
 
-1. **CI Artifact Integration (Remaining ~5% of instrumentation task)**
-   - Add a lightweight CI step that runs the stress harness export, publishing CSV/JSON outputs as build artifacts for regression triage.
-2. **Credential Wiring for S3 Adapter (Remaining ~5% of persistence task)**
-   - Parameterize `S3ProjectRepository` with environment-driven credentials and document secure configuration so we can exercise a real bucket during Step 3 pilots.
-3. **Diagram Pipeline Enforcement (Remaining ~5%)**
-   - Automate `tools/publish_diagrams.py` within CI to ensure rendered SVGs stay synchronized with Mermaid sources before Step 3 documentation expansions.
+1. **Stress Harness Trend Analysis (Remaining ~5% of instrumentation task)**
+   - Automate comparison between successive CSV/JSON exports to flag regressions directly in CI summaries before scaling Step 3 modules.
+2. **Live S3 Smoke Test (Remaining ~5% of persistence task)**
+   - Exercise `S3ProjectRepository.from_environment` against a low-cost bucket, capturing latency metrics and documenting rollout steps for shared environments.
+3. **Mermaid Renderer Version Pinning (Remaining ~5% documentation task)**
+   - Containerize or otherwise pin the Mermaid CLI version to guarantee deterministic SVG outputs as diagram complexity grows.
 
 These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 

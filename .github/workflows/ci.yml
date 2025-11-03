@@ -33,6 +33,14 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli
+
       - name: Lint with ruff
         run: poetry run ruff check .
 
@@ -41,3 +49,21 @@ jobs:
 
       - name: Run tests
         run: poetry run pytest
+
+      - name: Generate stress harness artifacts
+        run: |
+          poetry run python prototypes/audio_engine_skeleton.py \
+            --stress-plan docs/qa/stress_plan.json \
+            --export-json docs/qa/artifacts/stress_results.json \
+            --export-csv docs/qa/artifacts/stress_results.csv
+
+      - name: Upload stress harness artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-harness-results
+          path: |
+            docs/qa/artifacts/stress_results.csv
+            docs/qa/artifacts/stress_results.json
+
+      - name: Publish Mermaid diagrams
+        run: poetry run python tools/publish_diagrams.py --renderer mmdc

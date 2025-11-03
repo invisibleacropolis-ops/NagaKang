@@ -1,7 +1,7 @@
 import io
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
 import pytest
 
@@ -206,4 +206,36 @@ def test_s3_repository_missing_entries(tmp_path: Path) -> None:
 
     with pytest.raises(ProjectNotFoundError):
         repo.delete("missing")
+
+
+def test_s3_repository_from_environment_uses_factory(tmp_path: Path, example_project: Project) -> None:
+    adapter = ProjectFileAdapter(tmp_path)
+    client = StubS3Client()
+
+    def factory(env: Mapping[str, str]) -> StubS3Client:
+        assert env["NAGAKANG_S3_BUCKET"] == "bucket"
+        assert env["NAGAKANG_S3_PREFIX"] == "remote/projects"
+        assert env["NAGAKANG_S3_EXTENSION"] == ".json"
+        return client
+
+    env = {
+        "NAGAKANG_S3_BUCKET": "bucket",
+        "NAGAKANG_S3_PREFIX": "remote/projects",
+        "NAGAKANG_S3_EXTENSION": ".json",
+    }
+    repo = S3ProjectRepository.from_environment(
+        adapter,
+        env=env,
+        client_factory=factory,
+    )
+
+    summary = repo.save(example_project)
+    assert summary.location.endswith(f"/remote/projects/{example_project.metadata.id}.json")
+
+
+def test_s3_repository_from_environment_requires_bucket(tmp_path: Path) -> None:
+    adapter = ProjectFileAdapter(tmp_path)
+
+    with pytest.raises(ProjectRepositoryError):
+        S3ProjectRepository.from_environment(adapter, env={})
 

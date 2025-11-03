@@ -9,11 +9,12 @@ subsequent steps can expand capabilities without breaking callers.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Protocol, Tuple
 
 from .models import Project
 from .persistence import ProjectFileAdapter, ProjectSerializer
@@ -237,6 +238,80 @@ class S3ProjectRepository(ProjectRepository):
             if isinstance(no_such_key, type):
                 candidates.append(no_such_key)
             self._missing_exceptions = tuple(candidates)
+
+    @classmethod
+    def from_environment(
+        cls,
+        adapter: ProjectFileAdapter,
+        *,
+        prefix: str = "projects/",
+        extension: str = ".json",
+        missing_exceptions: Optional[Tuple[type[BaseException], ...]] = None,
+        env: Mapping[str, str] | None = None,
+        client_factory: Callable[[Mapping[str, str]], Any] | None = None,
+    ) -> "S3ProjectRepository":
+        """Instantiate the repository using environment-provided credentials.
+
+        The helper reads the following variables to construct a client:
+
+        ``NAGAKANG_S3_BUCKET`` (required)
+            Name of the target bucket storing project documents.
+        ``NAGAKANG_S3_PREFIX`` (optional)
+            Object prefix housing project files; defaults to ``projects/``.
+        ``NAGAKANG_S3_EXTENSION`` (optional)
+            File extension for stored documents; defaults to ``.json``.
+        ``NAGAKANG_S3_ENDPOINT_URL`` (optional)
+            Custom endpoint for self-hosted S3-compatible services.
+        ``AWS_ACCESS_KEY_ID`` / ``AWS_SECRET_ACCESS_KEY`` / ``AWS_SESSION_TOKEN``
+            Standard AWS credentials passed to ``boto3``.
+        ``AWS_REGION`` / ``AWS_DEFAULT_REGION``
+            Region forwarded to the client for latency-sensitive routing.
+
+        A custom ``client_factory`` may be provided to integrate with alternate
+        SDKs or to supply mocked clients during tests.
+        """
+
+        environment: Mapping[str, str]
+        environment = env or os.environ
+        bucket = environment.get("NAGAKANG_S3_BUCKET") or environment.get("AWS_S3_BUCKET")
+        if not bucket:
+            raise ProjectRepositoryError(
+                "NAGAKANG_S3_BUCKET environment variable must be set to configure the S3 repository"
+            )
+
+        resolved_prefix = environment.get("NAGAKANG_S3_PREFIX", prefix)
+        resolved_extension = environment.get("NAGAKANG_S3_EXTENSION", extension)
+
+        if client_factory is None:
+            try:
+                import boto3
+            except ImportError as exc:  # pragma: no cover - depends on optional dependency
+                raise ProjectRepositoryError(
+                    "boto3 is required to configure S3ProjectRepository from the environment"
+                ) from exc
+
+            session = boto3.session.Session(
+                aws_access_key_id=environment.get("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=environment.get("AWS_SECRET_ACCESS_KEY"),
+                aws_session_token=environment.get("AWS_SESSION_TOKEN"),
+                region_name=environment.get("AWS_REGION") or environment.get("AWS_DEFAULT_REGION"),
+            )
+            endpoint_url = environment.get("NAGAKANG_S3_ENDPOINT_URL")
+            client_kwargs: Dict[str, Any] = {}
+            if endpoint_url:
+                client_kwargs["endpoint_url"] = endpoint_url
+            s3_client = session.client("s3", **client_kwargs)
+        else:
+            s3_client = client_factory(environment)
+
+        return cls(
+            adapter,
+            s3_client,
+            bucket=bucket,
+            prefix=resolved_prefix,
+            extension=resolved_extension,
+            missing_exceptions=missing_exceptions,
+        )
 
     def _object_key(self, identifier: str) -> str:
         return f"{self._prefix}{identifier}{self._extension}" if self._prefix else f"{identifier}{self._extension}"
