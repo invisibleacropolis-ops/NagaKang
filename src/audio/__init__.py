@@ -7,7 +7,8 @@ from .engine import (
     ParameterSpec,
     TempoMap,
 )
-from .modules import SineOscillator
+from .metrics import integrated_lufs, rms_dbfs, rms_per_channel
+from .modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
 
 __all__ = [
     "AutomationEvent",
@@ -16,5 +17,10 @@ __all__ = [
     "OfflineAudioEngine",
     "ParameterSpec",
     "TempoMap",
+    "AmplitudeEnvelope",
+    "OnePoleLowPass",
     "SineOscillator",
+    "integrated_lufs",
+    "rms_dbfs",
+    "rms_per_channel",
 ]

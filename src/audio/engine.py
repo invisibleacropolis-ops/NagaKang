@@ -23,16 +23,21 @@ class ParameterSpec:
 
     name: str
     display_name: str
-    default: float
+    default: float | None
     minimum: float
     maximum: float
     unit: str = ""
     description: str = ""
     musical_context: Optional[str] = None
+    allow_none: bool = False
 
-    def clamp(self, value: float) -> float:
+    def clamp(self, value: float | None) -> float | None:
         """Ensure *value* stays within the declared bounds."""
 
+        if value is None:
+            if not self.allow_none:
+                raise ValueError(f"Parameter '{self.name}' does not accept silence/null values")
+            return None
         if value < self.minimum:
             return self.minimum
         if value > self.maximum:
@@ -47,7 +52,7 @@ class AutomationEvent:
     time_seconds: float
     module: str = field(compare=False)
     parameter: str = field(compare=False)
-    value: float = field(compare=False)
+    value: float | None = field(compare=False)
     source: str = field(default="", compare=False)
 
 
@@ -80,7 +85,7 @@ class AutomationTimeline:
         module: str,
         parameter: str,
         beats: float,
-        value: float,
+        value: float | None,
         tempo: TempoMap,
         source: str = "",
     ) -> None:
@@ -110,15 +115,15 @@ class BaseAudioModule:
         self.name = name
         self.config = config
         self._specs: Dict[str, ParameterSpec] = {spec.name: spec for spec in parameters}
-        self._values: Dict[str, float] = {spec.name: spec.default for spec in parameters}
+        self._values: Dict[str, float | None] = {spec.name: spec.default for spec in parameters}
 
-    def set_parameter(self, name: str, value: float) -> None:
+    def set_parameter(self, name: str, value: float | None) -> None:
         if name not in self._specs:
             raise KeyError(f"Unknown parameter '{name}' for module {self.name}")
         spec = self._specs[name]
         self._values[name] = spec.clamp(value)
 
-    def get_parameter(self, name: str) -> float:
+    def get_parameter(self, name: str) -> float | None:
         if name not in self._values:
             raise KeyError(f"Unknown parameter '{name}' for module {self.name}")
         return self._values[name]
@@ -163,7 +168,7 @@ class OfflineAudioEngine:
         module: str,
         parameter: str,
         *,
-        value: float,
+        value: float | None,
         time_seconds: Optional[float] = None,
         beats: Optional[float] = None,
         source: str = "",

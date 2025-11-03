@@ -41,6 +41,18 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - fallback
     sd = None  # type: ignore
 
+from audio.engine import (
+    AutomationTimeline as MusicianAutomationTimeline,
+    BaseAudioModule as MusicianBaseModule,
+    EngineConfig as MusicianEngineConfig,
+    OfflineAudioEngine as MusicianOfflineEngine,
+    ParameterSpec as MusicianParameterSpec,
+    TempoMap as MusicianTempoMap,
+)
+from audio.metrics import integrated_lufs as musician_integrated_lufs
+from audio.metrics import rms_dbfs as musician_rms_dbfs
+from audio.modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
+
 
 @dataclass
 class AudioSettings:
@@ -48,6 +60,7 @@ class AudioSettings:
     block_size: int = 512
     channels: int = 2
     test_tone_hz: Optional[float] = None
+    tempo_bpm: float = 120.0
 
 
 @dataclass(order=True)
@@ -199,6 +212,43 @@ class ModuleGraph:
         return np.tile(tone[:, None], (1, self.settings.channels))
 
 
+class _ModuleGraphAdapter(MusicianBaseModule):
+    """Bridge ModuleGraph into the musician-focused OfflineAudioEngine."""
+
+    def __init__(self, graph: ModuleGraph, config: MusicianEngineConfig) -> None:
+        super().__init__(
+            "prototype_graph",
+            config,
+            [
+                MusicianParameterSpec(
+                    name="test_tone_hz",
+                    display_name="Test Tone",
+                    default=graph.get_parameter("test_tone_hz"),
+                    minimum=0.0,
+                    maximum=20_000.0,
+                    unit="Hz",
+                    description="Reference tone routed through the prototype graph.",
+                    musical_context="pitch",
+                    allow_none=True,
+                )
+            ],
+        )
+        self._graph = graph
+
+    def set_parameter(self, name: str, value: float | None) -> None:  # type: ignore[override]
+        super().set_parameter(name, value)
+        if name == "test_tone_hz":
+            self._graph.set_parameter(name, value if value is not None else None)
+
+    def get_parameter(self, name: str) -> float | None:  # type: ignore[override]
+        if name == "test_tone_hz":
+            return self._graph.get_parameter(name)
+        return super().get_parameter(name)
+
+    def process(self, frames: int) -> "np.ndarray":
+        return self._graph.render(frames)
+
+
 class AudioEngine:
     def __init__(
         self,
@@ -262,6 +312,42 @@ class AudioEngine:
             buffers.append(self._on_audio_callback(frames))
             remaining -= frames
         return np.vstack(buffers)
+
+    def render_with_musician_engine(
+        self,
+        duration_seconds: float,
+        *,
+        beat_automation: Optional[Sequence[tuple[float, Optional[float]]]] = None,
+    ) -> "np.ndarray":
+        """Render using the production OfflineAudioEngine with beat automation."""
+
+        if np is None:
+            raise RuntimeError("NumPy is required for offline rendering.")
+
+        config = MusicianEngineConfig(
+            sample_rate=self.settings.sample_rate,
+            block_size=self.settings.block_size,
+            channels=self.settings.channels,
+        )
+        tempo = MusicianTempoMap(tempo_bpm=self.settings.tempo_bpm)
+        timeline = MusicianAutomationTimeline()
+        engine = MusicianOfflineEngine(config, tempo=tempo, timeline=timeline)
+        adapter = _ModuleGraphAdapter(self.graph, config)
+        engine.add_module(adapter, as_output=True)
+
+        if beat_automation is not None:
+            for beats, value in beat_automation:
+                engine.schedule_parameter_change(
+                    module=adapter.name,
+                    parameter="test_tone_hz",
+                    beats=beats,
+                    value=value,
+                    source="prototype beat automation",
+                )
+
+        buffer = engine.render(duration_seconds)
+        self.metrics.engine_time += duration_seconds
+        return buffer
 
     def run_stress_test(
         self, duration_seconds: float, *, processing_overhead: Optional[float] = None
@@ -446,6 +532,7 @@ def load_stress_plan(path: Path) -> list[StressTestScenario]:
             test_tone_hz=(
                 float(settings_payload["test_tone_hz"]) if "test_tone_hz" in settings_payload else None
             ),
+            tempo_bpm=float(settings_payload.get("tempo_bpm", AudioSettings.tempo_bpm)),
         )
         scenarios.append(
             StressTestScenario(
@@ -459,12 +546,56 @@ def load_stress_plan(path: Path) -> list[StressTestScenario]:
     return scenarios
 
 
+def render_musician_demo_patch(settings: AudioSettings, duration_seconds: float) -> dict[str, float]:
+    """Render a beat-synced tone demo and return headline loudness metrics."""
+
+    if np is None:
+        raise RuntimeError("NumPy is required for the musician demo render.")
+
+    config = MusicianEngineConfig(
+        sample_rate=settings.sample_rate,
+        block_size=settings.block_size,
+        channels=settings.channels,
+    )
+    engine = MusicianOfflineEngine(
+        config,
+        tempo=MusicianTempoMap(tempo_bpm=settings.tempo_bpm),
+        timeline=MusicianAutomationTimeline(),
+    )
+
+    oscillator = SineOscillator("lead", config)
+    envelope = AmplitudeEnvelope("lead_env", config, source=oscillator, attack_ms=35.0, release_ms=260.0)
+    filter_module = OnePoleLowPass("lead_filter", config, source=envelope, cutoff_hz=3_500.0)
+
+    engine.add_module(oscillator)
+    engine.add_module(envelope)
+    engine.add_module(filter_module, as_output=True)
+
+    engine.schedule_parameter_change("lead", "amplitude", value=0.6, time_seconds=0.0)
+    engine.schedule_parameter_change("lead_env", "gate", beats=0.0, value=1.0)
+    engine.schedule_parameter_change("lead_env", "gate", beats=4.0, value=0.0)
+    engine.schedule_parameter_change("lead_filter", "cutoff_hz", beats=0.0, value=2_000.0)
+    engine.schedule_parameter_change("lead_filter", "cutoff_hz", beats=2.0, value=6_000.0)
+    engine.schedule_parameter_change("lead_filter", "cutoff_hz", beats=3.5, value=1_500.0)
+
+    buffer = engine.render(duration_seconds)
+    loudness = musician_rms_dbfs(buffer)
+    lufs = musician_integrated_lufs(buffer, sample_rate=config.sample_rate)
+    return {
+        "rms_left_dbfs": float(loudness[0]),
+        "rms_right_dbfs": float(loudness[-1]),
+        "integrated_lufs": float(lufs),
+        "duration_seconds": float(duration_seconds),
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the audio engine skeleton prototype")
     parser.add_argument("--duration", type=float, default=1.0, help="How long to run the engine (seconds)")
     parser.add_argument("--tone", type=float, default=None, help="Optional test tone frequency in Hz")
     parser.add_argument("--sample-rate", type=int, default=48_000, help="Sample rate in Hz")
     parser.add_argument("--block-size", type=int, default=512, help="Frames per callback")
+    parser.add_argument("--tempo", type=float, default=120.0, help="Tempo in BPM for beat automation")
     parser.add_argument(
         "--stress-plan",
         type=Path,
@@ -479,6 +610,11 @@ def parse_args() -> argparse.Namespace:
         "--export-csv",
         type=Path,
         help="Destination path for stress-test CSV summary (requires --stress-plan)",
+    )
+    parser.add_argument(
+        "--musician-demo",
+        action="store_true",
+        help="Render the Step 3 musician demo patch and print loudness metrics",
     )
     return parser.parse_args()
 
@@ -509,7 +645,19 @@ def main() -> None:
         sample_rate=args.sample_rate,
         block_size=args.block_size,
         test_tone_hz=args.tone,
+        tempo_bpm=args.tempo,
     )
+
+    if args.musician_demo:
+        metrics = render_musician_demo_patch(settings, args.duration)
+        logger.info(
+            "Musician demo render: %.2f s, RMS L/R %.2f/%.2f dBFS, integrated %.2f LUFS",
+            metrics["duration_seconds"],
+            metrics["rms_left_dbfs"],
+            metrics["rms_right_dbfs"],
+            metrics["integrated_lufs"],
+        )
+        return
     engine = AudioEngine(settings=settings)
     engine.start()
     time.sleep(max(0.0, args.duration))
