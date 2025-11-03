@@ -18,13 +18,16 @@ tests.
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import heapq
 import logging
 import queue
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from pathlib import Path
+from typing import Callable, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +122,29 @@ class AudioMetrics:
             "p95_callback_ms": self.callback_duration_p95 * 1_000.0,
             "avg_cpu_load": self.average_cpu_load,
             "max_cpu_load": self.max_cpu_load,
+        }
+
+
+@dataclass
+class StressTestScenario:
+    """Configuration bundle describing a single stress harness execution."""
+
+    name: str
+    duration_seconds: float
+    processing_overhead: float
+    settings: AudioSettings
+
+    def metadata(self) -> dict[str, object]:
+        """Return static metadata describing the scenario for exports."""
+
+        return {
+            "scenario": self.name,
+            "duration_seconds": float(self.duration_seconds),
+            "processing_overhead_seconds": float(self.processing_overhead),
+            "sample_rate": self.settings.sample_rate,
+            "block_size": self.settings.block_size,
+            "channels": self.settings.channels,
+            "test_tone_hz": self.settings.test_tone_hz,
         }
 
 
@@ -340,18 +366,145 @@ class AudioEngine:
         return buffer
 
 
+def _build_result_record(
+    scenario: StressTestScenario, snapshot: dict[str, float]
+) -> dict[str, object]:
+    record = scenario.metadata()
+    record.update(
+        {
+            "processed_blocks": int(round(snapshot["processed_blocks"])),
+            "underruns": int(round(snapshot["underruns"])),
+            "callbacks": int(round(snapshot["callbacks"])),
+            "avg_callback_ms": snapshot["avg_callback_ms"],
+            "p95_callback_ms": snapshot["p95_callback_ms"],
+            "avg_cpu_load": snapshot["avg_cpu_load"],
+            "max_cpu_load": snapshot["max_cpu_load"],
+        }
+    )
+    return record
+
+
+def run_stress_test_scenarios(
+    scenarios: Sequence[StressTestScenario],
+    *,
+    csv_path: Path | None = None,
+    json_path: Path | None = None,
+) -> list[dict[str, object]]:
+    """Execute multiple stress-test scenarios and optionally export artifacts."""
+
+    results: list[dict[str, object]] = []
+    for scenario in scenarios:
+        engine = AudioEngine(settings=scenario.settings)
+        metrics = engine.run_stress_test(
+            scenario.duration_seconds, processing_overhead=scenario.processing_overhead
+        )
+        results.append(_build_result_record(scenario, metrics.snapshot()))
+
+    if csv_path is not None and results:
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(results[0].keys())
+        with csv_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(results)
+
+    if json_path is not None:
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with json_path.open("w", encoding="utf-8") as handle:
+            json.dump(results, handle, indent=2)
+
+    return results
+
+
+def load_stress_plan(path: Path) -> list[StressTestScenario]:
+    """Load a JSON plan describing stress harness scenarios."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("Stress plan must be a JSON array of scenario objects")
+
+    scenarios: list[StressTestScenario] = []
+    for entry in payload:
+        if not isinstance(entry, dict):
+            raise ValueError("Each scenario must be a JSON object")
+
+        try:
+            name = str(entry["name"])
+            duration = float(entry["duration_seconds"])
+        except KeyError as exc:  # pragma: no cover - defensive guard
+            raise ValueError("Scenario missing required keys 'name' or 'duration_seconds'") from exc
+
+        processing_overhead = float(entry.get("processing_overhead_seconds", 0.0))
+        settings_payload = entry.get("settings", {})
+        if not isinstance(settings_payload, dict):
+            raise ValueError("Scenario 'settings' must be an object")
+
+        settings = AudioSettings(
+            sample_rate=int(settings_payload.get("sample_rate", AudioSettings.sample_rate)),
+            block_size=int(settings_payload.get("block_size", AudioSettings.block_size)),
+            channels=int(settings_payload.get("channels", AudioSettings.channels)),
+            test_tone_hz=(
+                float(settings_payload["test_tone_hz"]) if "test_tone_hz" in settings_payload else None
+            ),
+        )
+        scenarios.append(
+            StressTestScenario(
+                name=name,
+                duration_seconds=duration,
+                processing_overhead=processing_overhead,
+                settings=settings,
+            )
+        )
+
+    return scenarios
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the audio engine skeleton prototype")
     parser.add_argument("--duration", type=float, default=1.0, help="How long to run the engine (seconds)")
     parser.add_argument("--tone", type=float, default=None, help="Optional test tone frequency in Hz")
     parser.add_argument("--sample-rate", type=int, default=48_000, help="Sample rate in Hz")
     parser.add_argument("--block-size", type=int, default=512, help="Frames per callback")
+    parser.add_argument(
+        "--stress-plan",
+        type=Path,
+        help="JSON file describing offline stress-test scenarios to execute",
+    )
+    parser.add_argument(
+        "--export-json",
+        type=Path,
+        help="Destination path for stress-test JSON summary (requires --stress-plan)",
+    )
+    parser.add_argument(
+        "--export-csv",
+        type=Path,
+        help="Destination path for stress-test CSV summary (requires --stress-plan)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     args = parse_args()
+
+    if args.stress_plan is not None:
+        scenarios = load_stress_plan(args.stress_plan)
+        results = run_stress_test_scenarios(
+            scenarios, csv_path=args.export_csv, json_path=args.export_json
+        )
+        for record in results:
+            logger.info(
+                "Scenario %s: callbacks=%s underruns=%s avg=%.4fms p95=%.4fms cpu=%.3f/%.3f",
+                record["scenario"],
+                record["callbacks"],
+                record["underruns"],
+                record["avg_callback_ms"],
+                record["p95_callback_ms"],
+                record["avg_cpu_load"],
+                record["max_cpu_load"],
+            )
+        return
+
     settings = AudioSettings(
         sample_rate=args.sample_rate,
         block_size=args.block_size,

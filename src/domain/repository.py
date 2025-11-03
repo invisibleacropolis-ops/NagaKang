@@ -8,11 +8,12 @@ subsequent steps can expand capabilities without breaking callers.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 import time
 from pathlib import Path
-from typing import Dict, Iterable, Protocol
+from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
 
 from .models import Project
 from .persistence import ProjectFileAdapter, ProjectSerializer
@@ -200,7 +201,6 @@ class MockCloudProjectRepository(ProjectRepository):
             cache_path.unlink()
 
     def list(self) -> Iterable[ProjectSummary]:
-        self._simulate_latency()
         for identifier, payload in sorted(self._objects.items()):
             project = ProjectSerializer.from_dict(payload)  # type: ignore[arg-type]
             yield ProjectSummary(
@@ -208,4 +208,178 @@ class MockCloudProjectRepository(ProjectRepository):
                 name=project.metadata.name,
                 updated_at=project.metadata.updated_at,
                 location=f"cloud://{self._bucket}/{identifier}",
+            )
+
+
+class S3ProjectRepository(ProjectRepository):
+    """S3-backed repository that mirrors remote objects into a local cache."""
+
+    def __init__(
+        self,
+        adapter: ProjectFileAdapter,
+        s3_client: Any,
+        *,
+        bucket: str,
+        prefix: str = "projects/",
+        extension: str = ".json",
+        missing_exceptions: Optional[Tuple[type[BaseException], ...]] = None,
+    ) -> None:
+        self._adapter = adapter
+        self._s3 = s3_client
+        self._bucket = bucket
+        self._prefix = prefix if prefix.endswith("/") or not prefix else f"{prefix.rstrip('/')}/"
+        self._extension = extension
+        if missing_exceptions is not None:
+            self._missing_exceptions = missing_exceptions
+        else:
+            candidates: list[type[BaseException]] = [KeyError]
+            no_such_key = getattr(getattr(s3_client, "exceptions", None), "NoSuchKey", None)
+            if isinstance(no_such_key, type):
+                candidates.append(no_such_key)
+            self._missing_exceptions = tuple(candidates)
+
+    def _object_key(self, identifier: str) -> str:
+        return f"{self._prefix}{identifier}{self._extension}" if self._prefix else f"{identifier}{self._extension}"
+
+    def _path_for(self, identifier: str) -> Path:
+        return self._adapter.base_path / f"{identifier}{self._extension}"
+
+    def _read_body(self, body: Any) -> bytes:
+        if body is None:
+            raise ProjectRepositoryError("S3 response missing Body payload")
+        if hasattr(body, "read"):
+            return body.read()
+        if isinstance(body, (bytes, bytearray)):
+            return bytes(body)
+        raise ProjectRepositoryError("Unsupported S3 body payload type")
+
+    def _head_object(self, key: str) -> Optional[dict[str, Any]]:
+        try:
+            return self._s3.head_object(Bucket=self._bucket, Key=key)
+        except self._missing_exceptions:
+            return None
+        except Exception as exc:  # pragma: no cover - defensive against provider errors
+            raise ProjectRepositoryError("Failed to inspect project metadata in S3") from exc
+
+    def _remote_revision(self, key: str) -> Optional[datetime]:
+        response = self._head_object(key)
+        if response is None:
+            return None
+        metadata = response.get("Metadata", {})
+        updated_at = metadata.get("updated_at")
+        if isinstance(updated_at, str):
+            try:
+                return datetime.fromisoformat(updated_at)
+            except ValueError:  # pragma: no cover - malformed provider metadata
+                pass
+        last_modified = response.get("LastModified")
+        if isinstance(last_modified, datetime):
+            return last_modified
+        return None
+
+    def _identifier_from_key(self, key: str) -> Optional[str]:
+        if self._prefix and not key.startswith(self._prefix):
+            return None
+        trimmed = key[len(self._prefix) :] if self._prefix else key
+        if not trimmed.endswith(self._extension):
+            return None
+        return trimmed[: -len(self._extension)]
+
+    def save(self, project: Project) -> ProjectSummary:
+        key = self._object_key(project.metadata.id)
+        remote_revision = self._remote_revision(key)
+        if remote_revision and project.metadata.updated_at <= remote_revision:
+            raise ProjectRepositoryError(
+                "Remote project is newer than local state; refresh before overwriting"
+            )
+
+        payload = json.dumps(ProjectSerializer.to_dict(project), separators=(",", ":")).encode("utf-8")
+        metadata = {
+            "updated_at": project.metadata.updated_at.isoformat(),
+            "name": project.metadata.name,
+        }
+        try:
+            self._s3.put_object(
+                Bucket=self._bucket,
+                Key=key,
+                Body=payload,
+                Metadata=metadata,
+                ContentType="application/json",
+            )
+        except Exception as exc:  # pragma: no cover - depends on provider client
+            raise ProjectRepositoryError("Failed to upload project to S3") from exc
+
+        self._adapter.save(project, f"{project.metadata.id}{self._extension}")
+        return ProjectSummary(
+            identifier=project.metadata.id,
+            name=project.metadata.name,
+            updated_at=project.metadata.updated_at,
+            location=f"s3://{self._bucket}/{key}",
+        )
+
+    def load(self, identifier: str) -> Project:
+        key = self._object_key(identifier)
+        try:
+            response = self._s3.get_object(Bucket=self._bucket, Key=key)
+        except self._missing_exceptions as exc:
+            raise ProjectNotFoundError(f"Project {identifier!r} not found in S3 bucket {self._bucket}") from exc
+        except Exception as exc:  # pragma: no cover - provider specific error
+            raise ProjectRepositoryError("Failed to download project from S3") from exc
+
+        body = self._read_body(response.get("Body"))
+        payload = json.loads(body.decode("utf-8"))
+        project = ProjectSerializer.from_dict(payload)
+        self._adapter.save(project, f"{identifier}{self._extension}")
+        return project
+
+    def delete(self, identifier: str) -> None:
+        key = self._object_key(identifier)
+        try:
+            self._s3.delete_object(Bucket=self._bucket, Key=key)
+        except self._missing_exceptions as exc:
+            raise ProjectNotFoundError(f"Project {identifier!r} not found in S3 bucket {self._bucket}") from exc
+        except Exception as exc:  # pragma: no cover - provider specific error
+            raise ProjectRepositoryError("Failed to delete project from S3") from exc
+
+        cache_path = self._path_for(identifier)
+        if cache_path.exists():
+            cache_path.unlink()
+
+    def list(self) -> Iterable[ProjectSummary]:
+        try:
+            response = self._s3.list_objects_v2(Bucket=self._bucket, Prefix=self._prefix)
+        except Exception as exc:  # pragma: no cover - provider specific error
+            raise ProjectRepositoryError("Failed to enumerate projects in S3") from exc
+
+        contents = response.get("Contents", []) or []
+        for entry in contents:
+            key = entry.get("Key")
+            if not isinstance(key, str):
+                continue
+            identifier = self._identifier_from_key(key)
+            if identifier is None:
+                continue
+            head = self._head_object(key)
+            if head is None:
+                continue
+            metadata = head.get("Metadata", {})
+            revision: Optional[datetime] = None
+            updated_field = metadata.get("updated_at")
+            if isinstance(updated_field, str):
+                try:
+                    revision = datetime.fromisoformat(updated_field)
+                except ValueError:  # pragma: no cover - malformed metadata
+                    revision = None
+            if revision is None:
+                last_modified = head.get("LastModified") or entry.get("LastModified")
+                if isinstance(last_modified, datetime):
+                    revision = last_modified
+            if revision is None:
+                revision = datetime.utcnow()
+            name = metadata.get("name") or identifier
+            yield ProjectSummary(
+                identifier=identifier,
+                name=name,
+                updated_at=revision,
+                location=f"s3://{self._bucket}/{key}",
             )

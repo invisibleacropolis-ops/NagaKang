@@ -90,21 +90,20 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-### Step 2 Progress Update – Session 6
+### Step 2 Progress Update – Session 7
 
-- Expanded the stress harness to capture callback latency distributions and CPU load aggregates, publishing reproducible tables in `docs/qa/audio_engine_benchmarks.md` to satisfy Plan §9 evidence requirements.
-- Deepened the cloud synchronization narrative with concrete S3/WebDAV trade-offs and conflict strategies, tying the enhanced `MockCloudProjectRepository` behaviours back to the persistence roadmap in Plan §2/§8.
-- Refreshed documentation structure guidance to highlight the new QA artifact space and how contributors should archive benchmark outputs alongside CI logs.
-- Updated failure-mode/controller routing diagram plans (see `docs/step2_architecture_diagrams.md`) to reflect telemetry feedback loops and remote persistence considerations captured during this session.
+- Automated the stress harness export pipeline with JSON/CSV emitters driven by `docs/qa/stress_plan.json`, wiring command-line options into `prototypes/audio_engine_skeleton.py` so CI can archive latency evidence per Plan §9.
+- Implemented `S3ProjectRepository` with optimistic concurrency checks and caching to validate the live cloud sync narrative introduced in Plan §2/§8, complete with unit tests exercising failure paths.
+- Added `tools/publish_diagrams.py` to standardize Mermaid-to-SVG exports and updated documentation indices to guide contributors through the publishing workflow ahead of Step 3 diagram refreshes.
 
 ### Revised Next Actions
 
-1. **Automate Benchmark Export (Remaining ~5% of instrumentation task)**
-   - Add CSV/JSON emitters to `run_stress_test` workflows so CI can attach latency regressions to artifacts automatically.
-2. **Prototype Provider Integration (Remaining ~10% of persistence task)**
-   - Spike a real S3 client adapter behind the repository interface to validate credential injection and conflict hooks under live network latency.
-3. **Diagram Publishing Pipeline (Remaining ~5%)**
-   - Script Mermaid-to-SVG exports and embed refreshed failure-mode/controller routing visuals into contributor docs ahead of Step 3 execution.
+1. **CI Artifact Integration (Remaining ~5% of instrumentation task)**
+   - Add a lightweight CI step that runs the stress harness export, publishing CSV/JSON outputs as build artifacts for regression triage.
+2. **Credential Wiring for S3 Adapter (Remaining ~5% of persistence task)**
+   - Parameterize `S3ProjectRepository` with environment-driven credentials and document secure configuration so we can exercise a real bucket during Step 3 pilots.
+3. **Diagram Pipeline Enforcement (Remaining ~5%)**
+   - Automate `tools/publish_diagrams.py` within CI to ensure rendered SVGs stay synchronized with Mermaid sources before Step 3 documentation expansions.
 
 These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Baseline",
+    "duration_seconds": 0.5,
+    "processing_overhead_seconds": 0.0,
+    "settings": {
+      "sample_rate": 48000,
+      "block_size": 256,
+      "channels": 2,
+      "test_tone_hz": 440.0
+    }
+  },
+  {
+    "name": "ModerateLoad",
+    "duration_seconds": 0.5,
+    "processing_overhead_seconds": 0.0008,
+    "settings": {
+      "sample_rate": 48000,
+      "block_size": 128,
+      "channels": 2,
+      "test_tone_hz": 440.0
+    }
+  },
+  {
+    "name": "Overloaded",
+    "duration_seconds": 0.25,
+    "processing_overhead_seconds": 0.0025,
+    "settings": {
+      "sample_rate": 48000,
+      "block_size": 64,
+      "channels": 2,
+      "test_tone_hz": 440.0
+    }
+  }
+]

@@ -75,7 +75,7 @@ sequenceDiagram
 
 ## Next Steps
 
-- Export these Mermaid diagrams to SVG/PNG assets when preparing external documentation bundles.
+- Export these Mermaid diagrams to SVG/PNG assets when preparing external documentation bundles using `tools/publish_diagrams.py` (e.g., `poetry run python tools/publish_diagrams.py --renderer mmdc`).
 - Extend the sequence diagram set with failure scenarios (buffer underruns, module hot-swap) as prototypes mature.
 - Keep controller routing visuals aligned with hardware mapping discoveries during Plan §5 prototyping.
 
