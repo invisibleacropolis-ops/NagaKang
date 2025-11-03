@@ -16,6 +16,7 @@ from .repository import (
     ProjectRepository,
     ProjectRepositoryError,
     ProjectSummary,
+    S3ProjectRepository,
 )
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "ProjectRepository",
     "LocalProjectRepository",
     "InMemoryProjectRepository",
+    "S3ProjectRepository",
     "ProjectSummary",
     "ProjectRepositoryError",
     "ProjectNotFoundError",

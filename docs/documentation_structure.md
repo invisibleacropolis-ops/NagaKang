@@ -8,7 +8,8 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
-- `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals.
+- `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries under `docs/qa/artifacts/`.
+- `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.
 - `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.
 - `.github/workflows/ci.yml` – Continuous integration pipeline invoking Poetry, Ruff, Mypy, and Pytest for baseline quality gates.
 - `pyproject.toml` – Poetry configuration defining dependencies, lint/type-check tooling, and pytest defaults.
@@ -33,8 +34,8 @@ This index formalizes how project documentation is organized so contributors can
    - Ensure tables include header rows and avoid color-only distinctions to align with Step 1 accessibility commitments.
 
 5. **Tooling Notes**
-   - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`.
-   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10.
+   - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`; run `poetry run python tools/publish_diagrams.py --renderer mmdc` to regenerate SVGs.
+   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json ...` to refresh latency tables and attach CSV/JSON artifacts to CI runs.
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
 
@@ -54,3 +55,4 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-09 – Added repository abstractions, stress-test automation references, and expanded diagram index for Step 2 instrumentation work.
 - 2025-11-12 – Captured CI runbook commands and referenced golden audio fixtures plus mock cloud repository guidance.
 - 2025-11-15 – Added QA directory reference and benchmark documentation pointers tied to Step 2 instrumentation.
+- 2025-11-16 – Documented automated stress harness exports and the Mermaid publishing pipeline utility.

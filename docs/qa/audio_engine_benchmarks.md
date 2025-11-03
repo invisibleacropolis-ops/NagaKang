@@ -8,29 +8,20 @@ These measurements document the Step 2 instrumentation follow-up described in th
 - Report CPU load as the ratio of callback duration to buffer duration; loads >1.0 indicate underruns at the given configuration.
 - Scenarios cover nominal processing, moderate simulated work (`processing_overhead`), and an intentionally overloaded case for alert calibration.
 
-Command snippet:
+Command snippet (automated export):
 
 ```bash
-python - <<'PY'
-from prototypes.audio_engine_skeleton import AudioEngine, AudioSettings
-
-scenarios = [
-    {"name": "Baseline", "duration": 0.5, "overhead": 0.0, "settings": AudioSettings(block_size=256, test_tone_hz=440.0)},
-    {"name": "ModerateLoad", "duration": 0.5, "overhead": 0.0008, "settings": AudioSettings(block_size=128, test_tone_hz=440.0)},
-    {"name": "Overloaded", "duration": 0.25, "overhead": 0.0025, "settings": AudioSettings(block_size=64, test_tone_hz=440.0)},
-]
-
-rows = []
-for scenario in scenarios:
-    engine = AudioEngine(settings=scenario["settings"], processing_overhead=0.0)
-    metrics = engine.run_stress_test(scenario["duration"], processing_overhead=scenario["overhead"])
-    snapshot = metrics.snapshot()
-    rows.append((scenario["name"], scenario["settings"].block_size, snapshot))
-
-for name, block_size, snapshot in rows:
-    print(name, block_size, snapshot)
-PY
+python prototypes/audio_engine_skeleton.py \
+  --stress-plan docs/qa/stress_plan.json \
+  --export-json docs/qa/artifacts/audio_metrics.json \
+  --export-csv docs/qa/artifacts/audio_metrics.csv
 ```
+
+The JSON plan stored alongside this document (`docs/qa/stress_plan.json`) mirrors the
+manual scenarios listed above, enabling CI and external engineers to generate the same
+artifacts without editing code. The exported CSV/JSON files capture the aggregated
+metrics shown in the table below, making latency regressions easy to diff across
+branches.
 
 ## Results
 

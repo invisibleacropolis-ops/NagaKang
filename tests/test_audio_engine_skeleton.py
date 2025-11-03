@@ -1,10 +1,17 @@
+import csv
 import json
 import math
 from pathlib import Path
 
 import pytest
 
-from prototypes.audio_engine_skeleton import AudioEngine, AudioSettings
+from prototypes.audio_engine_skeleton import (
+    AudioEngine,
+    AudioSettings,
+    StressTestScenario,
+    load_stress_plan,
+    run_stress_test_scenarios,
+)
 
 try:
     import numpy as np
@@ -118,3 +125,65 @@ def test_multi_stage_automation_creates_distinct_signal_segments():
     assert _rms(silent_segment) < 1e-3
     assert _rms(final_segment) > 0.3
     assert math.isclose(engine.graph.get_parameter("test_tone_hz") or 0.0, 440.0, rel_tol=1e-6)
+
+
+def test_stress_scenario_runner_exports_csv_and_json(tmp_path):
+    scenarios = [
+        StressTestScenario(
+            name="Baseline",
+            duration_seconds=0.02,
+            processing_overhead=0.0,
+            settings=AudioSettings(block_size=64, test_tone_hz=220.0),
+        ),
+        StressTestScenario(
+            name="Loaded",
+            duration_seconds=0.02,
+            processing_overhead=0.0004,
+            settings=AudioSettings(block_size=32, test_tone_hz=440.0),
+        ),
+    ]
+
+    csv_path = tmp_path / "metrics.csv"
+    json_path = tmp_path / "metrics.json"
+    results = run_stress_test_scenarios(scenarios, csv_path=csv_path, json_path=json_path)
+
+    assert csv_path.exists()
+    assert json_path.exists()
+    assert len(results) == len(scenarios)
+    assert isinstance(results[0]["callbacks"], int)
+
+    with csv_path.open(newline="", encoding="utf-8") as handle:
+        csv_rows = list(csv.DictReader(handle))
+    assert [row["scenario"] for row in csv_rows] == [scenario.name for scenario in scenarios]
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    assert payload[0]["scenario"] == "Baseline"
+    assert payload[0]["callbacks"] == results[0]["callbacks"]
+
+
+def test_load_stress_plan_parses_settings(tmp_path):
+    plan = [
+        {
+            "name": "PlanA",
+            "duration_seconds": 0.05,
+            "processing_overhead_seconds": 0.0005,
+            "settings": {
+                "sample_rate": 44_100,
+                "block_size": 128,
+                "channels": 2,
+                "test_tone_hz": 330.0,
+            },
+        }
+    ]
+    path = tmp_path / "plan.json"
+    path.write_text(json.dumps(plan), encoding="utf-8")
+
+    scenarios = load_stress_plan(path)
+    assert len(scenarios) == 1
+    scenario = scenarios[0]
+    assert isinstance(scenario, StressTestScenario)
+    assert scenario.settings.sample_rate == 44_100
+    assert scenario.settings.block_size == 128
+    assert scenario.settings.channels == 2
+    assert scenario.settings.test_tone_hz == 330.0
+    assert scenario.processing_overhead == pytest.approx(0.0005)
