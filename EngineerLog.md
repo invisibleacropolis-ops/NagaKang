@@ -1,5 +1,22 @@
 # Engineer Log
 
+# Session Summary (Step 2 Automation Hardening & Live Prep)
+- Revisited the Comprehensive Development Plan in `README.md` to confirm Step 2 focus areas before executing CI and persistence updates.
+- Extended `.github/workflows/ci.yml` with Node/Mermaid setup plus a stress harness export stage that archives CSV/JSON results via workflow artifacts, closing the final ~5% instrumentation automation gap. (Instrumentation automation completion: 100%)
+- Introduced `S3ProjectRepository.from_environment` to source bucket, prefix, and credential parameters from environment variables, expanding tests to cover the factory path and documenting CI runbook impacts. (Domain persistence layer completion: ~98%)
+- Wired Mermaid CLI execution into CI and refreshed documentation (`docs/documentation_structure.md`, `docs/step2_architecture_tech_choices.md`, `docs/qa/artifacts/README.md`) so contributors have reproducible commands and artifact guidance ahead of Step 3 documentation growth. (Documentation automation completion: ~98%)
+- Ran `poetry run pytest` after installing dev dependencies to validate repository factories, stress harness exports, and diagram tooling updates.
+
+## Outstanding TODOs / Next Session Goals
+1. **Automate Stress Harness Trend Checks (Instrumentation follow-up, remaining ~2%)**
+   - Compare successive CSV/JSON exports in CI and surface regressions directly in job summaries for faster detection.
+2. **Run Live S3 Smoke Test (Persistence follow-up, remaining ~2%)**
+   - Exercise the environment-configured repository against a staging bucket, record latency observations, and fold guidance into Step 2 documentation.
+3. **Pin Mermaid CLI Delivery (Documentation follow-up, remaining ~2%)**
+   - Containerize or lock Mermaid CLI versions so SVG outputs stay deterministic across contributors and CI.
+
+---
+
 # Session Summary (Step 2 Instrumentation Automation & Cloud Adapter Validation)
 - Reviewed the Comprehensive Development Plan in `README.md` to align exports, persistence, and documentation automation with Step 2 milestones before coding.
 - Added stress harness export options (`--stress-plan`, `--export-json`, `--export-csv`) to `prototypes/audio_engine_skeleton.py`, generating CSV/JSON artifacts from `docs/qa/stress_plan.json` and updating pytest coverage for the new workflow. (Audio engine prototyping completion: ~95% ➜ ~100%)

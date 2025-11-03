@@ -8,7 +8,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
-- `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries under `docs/qa/artifacts/`.
+- `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
 - `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.
 - `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.
 - `.github/workflows/ci.yml` – Continuous integration pipeline invoking Poetry, Ruff, Mypy, and Pytest for baseline quality gates.
@@ -35,7 +35,7 @@ This index formalizes how project documentation is organized so contributors can
 
 5. **Tooling Notes**
    - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`; run `poetry run python tools/publish_diagrams.py --renderer mmdc` to regenerate SVGs.
-   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json ...` to refresh latency tables and attach CSV/JSON artifacts to CI runs.
+   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` to refresh latency tables and attach CSV/JSON artifacts to CI runs.
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
 
@@ -46,6 +46,8 @@ These commands reflect the expectations enforced by the GitHub Actions pipeline 
 2. `poetry run ruff check` – Lint the codebase to satisfy style and static analysis policies outlined in Plan §9.
 3. `poetry run mypy` – Type-check the `src/` and `prototypes/` packages.
 4. `poetry run pytest` – Execute the full test suite. Golden render fixtures live under `tests/fixtures/`; use `pytest -k audio_engine` to focus on the stress harness when iterating on DSP modules.
+5. `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` – Regenerate benchmark artifacts captured by CI for manual inspection.
+6. `poetry run python tools/publish_diagrams.py --renderer mmdc` – Rebuild Mermaid diagrams after editing `.mmd` sources to keep SVG exports synchronized.
 
 Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to share with the broader engineering team.
 
