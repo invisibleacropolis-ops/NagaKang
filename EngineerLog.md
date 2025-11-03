@@ -1,5 +1,17 @@
 # Engineer Log
 
+# Session Summary (Step 2 Trend History & S3 Validation Hardening - Cadence Codification)
+- Reviewed the Comprehensive Development Plan in `README.md` (Plan §9) to align the stress harness cadence updates with performance QA milestones before editing documentation.
+- Documented a weekly baseline review process and tolerance governance in `docs/qa/artifacts/history/README.md`, linking the workflow back to the Plan §9 latency targets so external engineers understand escalation criteria.
+- Authored `docs/qa/artifacts/history/review_checklist.md` and cross-referenced it from `docs/qa/artifacts/README.md`, giving reviewers a repeatable template for history inspections and investigation tracking. (Baseline review cadence completion: ~98% ➜ 100%)
+- Ran `poetry run pytest` to verify that documentation updates preserved the existing automation and instrumentation tooling behaviours.
+
+## Outstanding TODOs / Next Session Goals
+1. **Run Smoke Test Against Staging Credentials (Remaining ~2%)**
+   - Coordinate with infrastructure to execute the enhanced smoke test using real S3 credentials, compare timings against the moto baseline, and update rollout notes in `docs/qa/s3_validation/`.
+2. **Persist Mermaid Cache in CI (Remaining ~2%)**
+   - Teach the GitHub Actions workflow to reuse the Puppeteer cache across runs and capture fallback troubleshooting guidance in the docs runbook.
+
 # Session Summary (Step 2 Trend History & S3 Validation Hardening)
 - Revisited the Comprehensive Development Plan in `README.md` to confirm Step 2 instrumentation, persistence, and documentation touch points before coding.
 - Expanded `tools/compare_stress_results.py` with JSON/Markdown history logging and appended guidance in `docs/qa/artifacts/README.md` plus `docs/qa/artifacts/history/README.md`, capturing a seeded history run to close the final ~3% instrumentation follow-up item. (Instrumentation automation completion: 100%)

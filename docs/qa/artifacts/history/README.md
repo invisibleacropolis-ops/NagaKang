@@ -44,3 +44,43 @@ Refer to `docs/qa/artifacts/README.md` for detailed guidance. In short:
 
 History artifacts keep instrumentation work (Plan §9) transparent and make it
 easy to surface trend insights during Step 3/4 performance reviews.
+
+## Baseline Review Cadence
+
+To keep the committed baseline aligned with current performance expectations,
+schedule a standing **weekly review** of the trend history artifacts. During
+the review:
+
+- Pull the latest CI artifacts for the stress harness comparison job.
+- Inspect `stress_trend_history.md` for newly appended investigations or open
+  regressions.
+- Spot-check the JSON history for unexpected tolerance overrides or scenario
+  additions.
+- File a follow-up issue if regressions have lingered for more than two review
+  cycles without a documented mitigation.
+
+Ad-hoc reviews are also recommended immediately after merging DSP-intensive
+changes or infrastructure updates that could shift performance envelopes.
+
+## Tolerance & Baseline Update Procedure
+
+When metrics fall outside the default tolerances (`abs_tol=1e-4`,
+`rel_tol=5e-3`) but the delta is expected, follow this process before updating
+the baseline artifacts under `docs/qa/artifacts/baseline/`:
+
+1. Capture fresh candidate exports and run the comparison command with history
+   logging enabled (see [Usage](#usage)).
+2. Document the rationale for the change in `stress_trend_history.md`,
+   including links to profiling data or pull requests.
+3. Confirm the new numbers against the product requirements in
+   [`README.md` Plan §9](../../../README.md) to ensure they meet latency and
+   underrun targets.
+4. Update the baseline CSV/JSON files and run the comparison again to confirm
+   a clean pass.
+5. Record the outcome in the
+   [`review_checklist.md`](review_checklist.md) template and commit the filled
+   entry alongside the updated baseline.
+
+If the deltas are unexpected, keep the baseline untouched and use the
+checklist to track investigation status until performance returns to the
+expected window.
