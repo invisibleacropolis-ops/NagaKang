@@ -5,6 +5,43 @@ This directory captures empirical latency observations when exercising the
 `tools/run_s3_smoke_test.py` here so future engineers can review the health of
 the deployment pipeline alongside other QA artifacts.
 
+## Quick Start for Musicians & QA Facilitators
+
+1. Create a text file named `.env.staging` (or similar) with the credentials the
+   infrastructure team provisioned for staging:
+
+   ```dotenv
+   # Example: copy/paste from your password manager without extra tooling
+   AWS_ACCESS_KEY_ID=your-key-here
+   AWS_SECRET_ACCESS_KEY=your-secret-here
+   AWS_REGION=us-east-1
+   NAGAKANG_S3_BUCKET=nagakang-staging-projects
+   NAGAKANG_S3_PREFIX=session-audits/
+   ```
+
+2. From the project root run the smoke helper, pointing it at your env file and
+   giving the session a friendly name musicians will recognize later:
+
+   ```bash
+   poetry run python tools/run_s3_smoke_test.py \
+       --identifier "stage-audition" \
+       --summary-json docs/qa/s3_validation/stage_audition.json \
+       --summary-markdown docs/qa/s3_validation/stage_audition.md \
+       --env-file .env.staging \
+       --bootstrap-bucket
+   ```
+
+3. Skim the Markdown summary that appears in `docs/qa/s3_validation/` and jot
+   down any performance notes your rehearsal uncovered. The JSON payload mirrors
+   the CLI output for engineers who need exact timings.
+
+4. Commit the artifacts (or paste highlights into the team chat) so everyone can
+   compare staging behaviour against the moto baseline without re-running the
+   script.
+
+These steps avoid manual environment exports or AWS-specific tooling; a .env
+file plus Poetry is all a rehearsal lead needs.
+
 ## Recommended Workflow
 
 ```bash
@@ -18,6 +55,9 @@ poetry run python tools/run_s3_smoke_test.py \
 - Use `--use-moto` when rehearsing locally without AWS credentials. The helper
   provisions an in-memory emulator so the smoke test can run offline while still
   producing comparable timing information.
+- Supply `--env-file your.env` when working with real credentials. The helper
+  reads `.env` style files so non-developers can copy/paste secrets without
+  touching shell profiles.
 - Provide `--endpoint-url` for custom S3-compatible deployments (e.g., MinIO or
   LocalStack) and pair it with `--bootstrap-bucket` to ensure the bucket exists
   before executing the workload.

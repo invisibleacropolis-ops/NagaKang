@@ -3,7 +3,10 @@ name = "nagakang"
 version = "0.1.0"
 description = "Audio workstation planning prototypes and tooling"
 authors = ["Project Automation <automation@example.com>"]
-packages = [{ include = "domain", from = "src" }]
+packages = [
+    { include = "domain", from = "src" },
+    { include = "audio", from = "src" },
+]
 readme = "README.md"
 
 [tool.poetry.dependencies]

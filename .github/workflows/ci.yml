@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      MERMAID_VERSION: "10.9.0"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,7 +41,15 @@ jobs:
           node-version: "20"
 
       - name: Install Mermaid CLI
-        run: npm install -g @mermaid-js/mermaid-cli@10.9.0
+        run: npm install -g @mermaid-js/mermaid-cli@${MERMAID_VERSION}
+
+      - name: Cache Mermaid Puppeteer assets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: ${{ runner.os }}-puppeteer-${{ env.MERMAID_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-puppeteer-
 
       - name: Lint with ruff
         run: poetry run ruff check .
@@ -76,4 +86,7 @@ jobs:
             docs/qa/artifacts/stress_results.json
 
       - name: Publish Mermaid diagrams
-        run: poetry run python tools/publish_diagrams.py --renderer mmdc
+        run: |
+          poetry run python tools/publish_diagrams.py \
+            --renderer mmdc \
+            --puppeteer-cache ~/.cache/puppeteer

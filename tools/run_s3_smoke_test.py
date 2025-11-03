@@ -174,6 +174,11 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--extension", type=str, help="Override the file extension used when persisting projects")
     parser.add_argument("--endpoint-url", type=str, help="Custom endpoint URL for S3-compatible services")
     parser.add_argument(
+        "--env-file",
+        type=Path,
+        help="Path to a .env-style file containing AWS and repository settings",
+    )
+    parser.add_argument(
         "--bootstrap-bucket",
         action="store_true",
         help="Create the target bucket before executing the smoke test",
@@ -204,8 +209,33 @@ def _maybe_mock_s3(enabled: bool):
         yield
 
 
+def _load_env_file(path: Path) -> dict[str, str]:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ProjectRepositoryError(f"Unable to read environment file {path}: {exc}") from exc
+    overrides: dict[str, str] = {}
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in stripped:
+            raise ProjectRepositoryError(
+                f"Invalid line in environment file {path}: '{line}'"
+            )
+        key, value = stripped.split("=", 1)
+        cleaned = value.strip()
+        if cleaned.startswith(("'", '"')) and cleaned.endswith(("'", '"')):
+            if cleaned[0] == cleaned[-1]:
+                cleaned = cleaned[1:-1]
+        overrides[key.strip()] = cleaned
+    return overrides
+
+
 def _build_environment(args: argparse.Namespace) -> dict[str, str]:
     environment = dict(os.environ)
+    if args.env_file:
+        environment.update(_load_env_file(args.env_file))
     if args.bucket:
         environment["NAGAKANG_S3_BUCKET"] = args.bucket
     if args.prefix:
