@@ -27,6 +27,9 @@ track investigations:
   future reviews.
 - If regressions appear unexpectedly, keep the history artifacts uncommitted
   and use them to collaborate on the root cause before touching the baseline.
+- Complete the [baseline review checklist](history/review_checklist.md) during
+  the weekly trend review or any ad-hoc investigation so cadence compliance and
+  rationale stay visible to the broader engineering team.
 
 See `docs/qa/artifacts/history/README.md` for a full rundown on maintaining the
 trend logs and sharing them with the broader engineering group.
