@@ -8,6 +8,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
+- `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals.
 - `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.
 - `.github/workflows/ci.yml` – Continuous integration pipeline invoking Poetry, Ruff, Mypy, and Pytest for baseline quality gates.
 - `pyproject.toml` – Poetry configuration defining dependencies, lint/type-check tooling, and pytest defaults.
@@ -52,3 +53,4 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-05 – Documented `src/domain/`, Poetry configuration, and CI workflow additions from Step 2 tooling tasks.
 - 2025-11-09 – Added repository abstractions, stress-test automation references, and expanded diagram index for Step 2 instrumentation work.
 - 2025-11-12 – Captured CI runbook commands and referenced golden audio fixtures plus mock cloud repository guidance.
+- 2025-11-15 – Added QA directory reference and benchmark documentation pointers tied to Step 2 instrumentation.

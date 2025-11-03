@@ -94,6 +94,7 @@ Support sample recording and editing (basic waveform editor).
 Create versioned autosave, crash recovery, and backup system.
 9. Performance & Quality Assurance
 Establish benchmarking suite (buffer underrun tests, CPU usage profiling).
+Stress harness outputs are catalogued in `docs/qa/audio_engine_benchmarks.md`, linking benchmark evidence back to this Plan §9 milestone.
 Integrate CI/CD pipeline:
 Automated unit tests (DSP modules, sequencer logic).
 GUI smoke tests (Kivy headless runs).

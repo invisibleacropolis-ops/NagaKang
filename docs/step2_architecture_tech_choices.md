@@ -66,6 +66,12 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Samples:** Managed via hashed filenames with deduplication index; optional embedded metadata (loop points, root note).
 - **Automation Data:** Stored as compressed binary (e.g., `numpy` arrays) for efficient interpolation while providing JSON fallbacks for diffability during collaboration.
 
+### Cloud Synchronization Trade-offs
+- **Provider Targets:** Initial adapters model AWS S3 (object storage with eventual consistency) and WebDAV shares (stronger consistency but higher latency). The `MockCloudProjectRepository` simulates these behaviours with stale-write detection to exercise conflict paths before integrating live services.
+- **Conflict Resolution:** Adopt optimistic concurrency via ETags/version IDs when available (S3) and fall back to timestamp + hash comparisons for WebDAV. Divergent edits trigger three-way merges using domain model diffs; UI surfaces non-destructive duplicate snapshots when automatic reconciliation fails.
+- **Bandwidth & Latency Mitigation:** Batch asset uploads, compress JSON manifests, and pre-fetch dependency graphs to local caches. Background sync workers apply exponential backoff with jitter to respect provider rate limits.
+- **Offline Mode:** Local cache remains authoritative when connectivity drops; queued mutations sync opportunistically with retry budgets and telemetry hooks feeding the QA benchmark dashboards.
+
 ## 6. Integration Points
 - **MIDI/OSC:** Provide device discovery services, mapping storage, and clock synchronization with Ableton Link compatibility as a stretch goal.
 - **External Assets:** Implement sandboxed importers with checksum validation to protect against malformed sample libraries.
@@ -84,21 +90,21 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-### Step 2 Progress Update – Session 5
+### Step 2 Progress Update – Session 6
 
-- Captured deterministic offline renders for the audio engine skeleton (Plan §3, §9) by generating golden fixtures and augmenting the pytest suite with multi-stage automation stress cases. The new assertions confirm <1e-3 RMS noise during muted segments and >0.3 RMS signal levels during active phases, establishing regression thresholds for underrun monitoring.
-- Introduced `MockCloudProjectRepository` to simulate S3/WebDAV style backends while enforcing stale-write detection aligned with the persistence strategy in Plan §2/§8. Local caches remain hydrated via `ProjectFileAdapter` to mimic hybrid sync workflows.
-- Documented CI and tooling conventions—including Poetry install/run commands and GitHub Actions expectations—in the documentation structure guide so external contributors can reliably reproduce QA steps.
-- Outlined Step 3 entry criteria and backlog seeds (Plan §3) focused on module framework scaffolding, modulation services, and sequencing hooks now that persistence and instrumentation scaffolds are in place.
+- Expanded the stress harness to capture callback latency distributions and CPU load aggregates, publishing reproducible tables in `docs/qa/audio_engine_benchmarks.md` to satisfy Plan §9 evidence requirements.
+- Deepened the cloud synchronization narrative with concrete S3/WebDAV trade-offs and conflict strategies, tying the enhanced `MockCloudProjectRepository` behaviours back to the persistence roadmap in Plan §2/§8.
+- Refreshed documentation structure guidance to highlight the new QA artifact space and how contributors should archive benchmark outputs alongside CI logs.
+- Updated failure-mode/controller routing diagram plans (see `docs/step2_architecture_diagrams.md`) to reflect telemetry feedback loops and remote persistence considerations captured during this session.
 
 ### Revised Next Actions
 
-1. **Audio Engine Benchmarks (Remaining ~10% of Step 2 instrumentation)**
-   - Extend the stress harness with CPU budget sampling and capture benchmark tables under `docs/qa/` once buffer underrun targets are established.
-2. **Cloud Sync Strategy Narrative (Remaining ~10% of persistence task)**
-   - Expand on eventual consistency trade-offs (conflict resolution, merge policies) and surface integration notes for real providers (AWS S3, WebDAV) using the new mock adapter as reference.
-3. **Diagram Maintenance (Remaining ~10%)**
-   - Refresh failure-mode/controller-routing diagrams with remote persistence pathways and audio benchmark data flows before transitioning to Step 3 builds.
+1. **Automate Benchmark Export (Remaining ~5% of instrumentation task)**
+   - Add CSV/JSON emitters to `run_stress_test` workflows so CI can attach latency regressions to artifacts automatically.
+2. **Prototype Provider Integration (Remaining ~10% of persistence task)**
+   - Spike a real S3 client adapter behind the repository interface to validate credential injection and conflict hooks under live network latency.
+3. **Diagram Publishing Pipeline (Remaining ~5%)**
+   - Script Mermaid-to-SVG exports and embed refreshed failure-mode/controller routing visuals into contributor docs ahead of Step 3 execution.
 
 These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 

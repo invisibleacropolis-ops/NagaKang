@@ -4,9 +4,12 @@ flowchart LR
     Discovery[Device Discovery]
     Mapper[Controller Mapper]
     Profiles[Profile Library]
+    CloudProfiles[Cloud Profile Sync]
     Sequencer[Sequencer Commands]
     Instrument[Instrument Parameters]
     Feedback[Visual / Haptic Feedback]
+    Telemetry[Telemetry Bus]
+    QAReports[QA Benchmark Archive]
 
     Controllers --> Discovery
     Discovery --> Mapper
@@ -14,6 +17,11 @@ flowchart LR
     Profiles --> Mapper
     Mapper --> Sequencer
     Mapper --> Instrument
+    Profiles --> CloudProfiles
+    CloudProfiles --> Profiles
     Sequencer --> Feedback
     Instrument --> Feedback
     Feedback --> Controllers
+    Sequencer --> Telemetry
+    Instrument --> Telemetry
+    Telemetry --> QAReports

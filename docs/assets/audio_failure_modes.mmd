@@ -3,6 +3,7 @@ flowchart TD
     subgraph Monitoring
         Metrics[Audio Metrics]
         Alerts[Alert Dispatcher]
+        Benchmarks[Benchmark Exporter]
     end
 
     subgraph Callback[Audio Callback]
@@ -13,11 +14,17 @@ flowchart TD
     Dispatcher[Event Dispatcher]
     Sequencer[Sequencer Thread]
     Recovery[Recovery Actions]
+    CloudSync[Cloud Persistence Adapter]
+    QAStore[QA Reports (docs/qa)]
 
     Sequencer -->|Events| Dispatcher
     Dispatcher --> Render
     Render --> Sleep
     Sleep --> Metrics
     Metrics -->|Underrun Threshold| Alerts
+    Metrics --> Benchmarks
+    Benchmarks -->|Export Tables| QAStore
     Alerts --> Recovery
     Recovery -->|Adjust Block Size / Notify UI| Sequencer
+    Recovery -->|Sync Project Snapshot| CloudSync
+    CloudSync -->|State Updates| Sequencer
