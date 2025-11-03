@@ -7,6 +7,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_ux_flows.md` – Narrative UX flows, gesture considerations, and wireframe roadmap.
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
+- `docs/step3_audio_engine_framework.md` – Musician-centric kickoff for the Step 3 audio engine and module scaffolding.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
 - `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
 - `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.
@@ -36,7 +37,7 @@ This index formalizes how project documentation is organized so contributors can
 5. **Tooling Notes**
    - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`; run `poetry run python tools/publish_diagrams.py --renderer mmdc --expected-version 10.9.0` to regenerate SVGs with the pinned CLI enforced in CI.
    - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` to refresh latency tables, then run `poetry run python tools/compare_stress_results.py --baseline-json docs/qa/artifacts/baseline/stress_results.json --candidate-json docs/qa/artifacts/stress_results.json --baseline-csv docs/qa/artifacts/baseline/stress_results.csv --candidate-csv docs/qa/artifacts/stress_results.csv --history-json docs/qa/artifacts/history/stress_trend_history.json --history-markdown docs/qa/artifacts/history/stress_trend_history.md --summary-path docs/qa/artifacts/history/latest_trend_summary.md` to confirm metrics remain within tolerance and append a traceable history entry.
-   - When validating remote credentials, execute `poetry run python tools/run_s3_smoke_test.py --identifier smoke-check --summary-markdown docs/qa/s3_validation/smoke_check.md --summary-json docs/qa/s3_validation/smoke_check.json --bootstrap-bucket` with real credentials. For local drills use `--use-moto` to run against the in-memory emulator without touching production buckets.
+   - When validating remote credentials, execute `poetry run python tools/run_s3_smoke_test.py --identifier smoke-check --summary-markdown docs/qa/s3_validation/smoke_check.md --summary-json docs/qa/s3_validation/smoke_check.json --bootstrap-bucket` with real credentials. Supply `--env-file .env.staging` so non-developers can copy/paste secrets without modifying shell profiles. For local drills use `--use-moto` to run against the in-memory emulator without touching production buckets.
    - To avoid re-downloading Chromium on every diagram export, supply `--puppeteer-cache .cache/puppeteer` (or another shared location) when running `tools/publish_diagrams.py`. The cache path is respected both locally and in CI thanks to the `PUPPETEER_CACHE_DIR` support wired into the helper.
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
@@ -63,3 +64,4 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-15 – Added QA directory reference and benchmark documentation pointers tied to Step 2 instrumentation.
 - 2025-11-16 – Documented automated stress harness exports and the Mermaid publishing pipeline utility.
 - 2025-11-18 – Added stress harness trend comparison workflow, S3 smoke test utility, and Mermaid CLI version pinning guidance.
+- 2025-11-19 – Documented the Step 3 audio engine kickoff, .env-based staging smoke test workflow, and Puppeteer cache reuse in CI.

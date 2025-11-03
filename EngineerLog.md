@@ -1,5 +1,36 @@
 # Engineer Log
 
+# Session Summary (Step 2 Closure & Step 3 Kickoff – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to align the final
+  Step 2 hardening items with the Step 3 musician-first goals before coding.
+- Added `.env` ingestion to `tools/run_s3_smoke_test.py`, refreshed
+  `docs/qa/s3_validation/README.md` with a musician-friendly playbook, and
+  extended test coverage so rehearsal leads can execute staging checks without
+  shell setup. (Staging smoke readiness completion: ~98% ➜ 100%)
+- Persisted the Mermaid/Puppeteer cache inside `.github/workflows/ci.yml` and
+  documented the behaviour in `docs/documentation_structure.md` to eliminate
+  redundant Chromium downloads. (Documentation automation completion: ~98% ➜
+  100%)
+- Launched the production `audio/` package (`EngineConfig`, `AutomationTimeline`,
+  `OfflineAudioEngine`, `SineOscillator`) plus supporting tests and Step 3
+  kickoff documentation, grounding the module framework in musician-facing
+  terminology. (Step 3 audio engine groundwork completion: 0% ➜ ~15%)
+- Ran `poetry run pytest` to validate the updated smoke-test tooling and the new
+  audio engine scaffolding.
+
+## Outstanding TODOs / Next Session Goals
+1. **Expand Step 3 Module Library (~15% ➜ 30%)**
+   - Implement envelope and filter modules using `ParameterSpec` so musicians see
+     familiar controls, and extend tests to cover parameter automation across
+     chained modules.
+2. **Integrate Offline Engine with Prototypes (~0% ➜ 20%)**
+   - Wire `OfflineAudioEngine` into `prototypes/audio_engine_skeleton.py` to
+     exercise tempo-aware automation alongside existing stress harness exports
+     and capture updated docs for musicians evaluating renders.
+3. **Quantify Render Metrics for Artists (~0% ➜ 20%)**
+   - Add RMS/LUFS summary helpers to the audio package, expose them in docs, and
+     surface quick-listening guidance tailored to performers preparing setlists.
+
 # Session Summary (Step 2 Trend History & S3 Validation Hardening - Cadence Codification)
 - Reviewed the Comprehensive Development Plan in `README.md` (Plan §9) to align the stress harness cadence updates with performance QA milestones before editing documentation.
 - Documented a weekly baseline review process and tolerance governance in `docs/qa/artifacts/history/README.md`, linking the workflow back to the Plan §9 latency targets so external engineers understand escalation criteria.
