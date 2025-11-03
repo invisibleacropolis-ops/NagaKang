@@ -90,20 +90,20 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-### Step 2 Progress Update – Session 7
+### Step 2 Progress Update – Session 8
 
-- Automated the stress harness export pipeline with JSON/CSV emitters driven by `docs/qa/stress_plan.json`, wiring command-line options into `prototypes/audio_engine_skeleton.py` so CI can archive latency evidence per Plan §9 and now publishing those artifacts on every workflow run.
-- Implemented `S3ProjectRepository` with optimistic concurrency checks, caching, and a new `from_environment` helper so deployment pipelines can source credentials from environment variables while keeping secrets out of the codebase.
-- Added `tools/publish_diagrams.py` to standardize Mermaid-to-SVG exports and updated documentation indices to guide contributors through the publishing workflow ahead of Step 3 diagram refreshes, with CI now invoking the renderer via Mermaid CLI.
+- Added `tools/compare_stress_results.py` and committed golden CSV/JSON exports under `docs/qa/artifacts/baseline/`. CI now runs the helper after regenerating artifacts to compare them against the baseline, surfaces regressions in the job summary, and fails the build on drift.
+- Introduced `tools/run_s3_smoke_test.py`, enabling engineers to provision an `S3ProjectRepository` from environment variables, execute save/load/list/delete operations, and capture latency metrics or Markdown/JSON summaries for deployment runbooks.
+- Pinned Mermaid CLI delivery to a specific version in CI and augmented `tools/publish_diagrams.py` with renderer verification so SVG exports remain deterministic across local and hosted environments.
 
 ### Revised Next Actions
 
-1. **Stress Harness Trend Analysis (Remaining ~5% of instrumentation task)**
-   - Automate comparison between successive CSV/JSON exports to flag regressions directly in CI summaries before scaling Step 3 modules.
-2. **Live S3 Smoke Test (Remaining ~5% of persistence task)**
-   - Exercise `S3ProjectRepository.from_environment` against a low-cost bucket, capturing latency metrics and documenting rollout steps for shared environments.
-3. **Mermaid Renderer Version Pinning (Remaining ~5% documentation task)**
-   - Containerize or otherwise pin the Mermaid CLI version to guarantee deterministic SVG outputs as diagram complexity grows.
+1. **Extend Stress Harness Trend Insights (Remaining ~3% instrumentation follow-up)**
+   - Track historical comparisons or tolerance adjustments in documentation so teams know when to refresh the baseline versus investigate regressions.
+2. **Run Live S3 Validation Against Real Infrastructure (Remaining ~3% persistence follow-up)**
+   - Execute the new smoke test with production-like credentials, record empirical latency in `docs/qa/`, and fold findings into rollout guidance.
+3. **Broaden Diagram Tooling Coverage (Remaining ~3% documentation follow-up)**
+   - Capture the enforced Mermaid CLI version in onboarding docs and explore container images for headless rendering parity across CI providers.
 
 These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 

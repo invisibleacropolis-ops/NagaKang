@@ -34,8 +34,9 @@ This index formalizes how project documentation is organized so contributors can
    - Ensure tables include header rows and avoid color-only distinctions to align with Step 1 accessibility commitments.
 
 5. **Tooling Notes**
-   - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`; run `poetry run python tools/publish_diagrams.py --renderer mmdc` to regenerate SVGs.
-   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` to refresh latency tables and attach CSV/JSON artifacts to CI runs.
+   - Maintain diagram source files in shared cloud workspaces (Figma/FigJam) with export references back to `docs/assets/`; run `poetry run python tools/publish_diagrams.py --renderer mmdc --expected-version 10.9.0` to regenerate SVGs with the pinned CLI enforced in CI.
+   - Capture benchmarking or testing outputs in dedicated subdirectories (e.g., `docs/qa/`) when we reach Steps 9–10. Use `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` to refresh latency tables, then run `poetry run python tools/compare_stress_results.py --baseline-json docs/qa/artifacts/baseline/stress_results.json --candidate-json docs/qa/artifacts/stress_results.json --baseline-csv docs/qa/artifacts/baseline/stress_results.csv --candidate-csv docs/qa/artifacts/stress_results.csv` to confirm metrics remain within tolerance and capture the Markdown summary for sharing.
+   - When validating remote credentials, execute `poetry run python tools/run_s3_smoke_test.py --identifier smoke-check --summary-markdown docs/qa/artifacts/s3_smoke.md` so end-to-end timings and repository status are recorded alongside QA artifacts.
 
 Following these conventions keeps the documentation system coherent as we progress through the roadmap.
 
@@ -47,7 +48,9 @@ These commands reflect the expectations enforced by the GitHub Actions pipeline 
 3. `poetry run mypy` – Type-check the `src/` and `prototypes/` packages.
 4. `poetry run pytest` – Execute the full test suite. Golden render fixtures live under `tests/fixtures/`; use `pytest -k audio_engine` to focus on the stress harness when iterating on DSP modules.
 5. `poetry run python prototypes/audio_engine_skeleton.py --stress-plan docs/qa/stress_plan.json --export-json docs/qa/artifacts/stress_results.json --export-csv docs/qa/artifacts/stress_results.csv` – Regenerate benchmark artifacts captured by CI for manual inspection.
-6. `poetry run python tools/publish_diagrams.py --renderer mmdc` – Rebuild Mermaid diagrams after editing `.mmd` sources to keep SVG exports synchronized.
+6. `poetry run python tools/publish_diagrams.py --renderer mmdc --expected-version 10.9.0` – Rebuild Mermaid diagrams after editing `.mmd` sources using the pinned CLI release enforced by CI.
+7. `poetry run python tools/compare_stress_results.py --baseline-json docs/qa/artifacts/baseline/stress_results.json --candidate-json docs/qa/artifacts/stress_results.json --baseline-csv docs/qa/artifacts/baseline/stress_results.csv --candidate-csv docs/qa/artifacts/stress_results.csv` – Validate stress harness exports against the committed baseline before pushing instrumentation updates.
+8. `poetry run python tools/run_s3_smoke_test.py --identifier local-smoke --summary-markdown docs/qa/artifacts/s3_smoke.md` – Exercise the environment-configured S3 repository and record latency notes alongside QA artifacts.
 
 Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to share with the broader engineering team.
 
@@ -58,3 +61,4 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-12 – Captured CI runbook commands and referenced golden audio fixtures plus mock cloud repository guidance.
 - 2025-11-15 – Added QA directory reference and benchmark documentation pointers tied to Step 2 instrumentation.
 - 2025-11-16 – Documented automated stress harness exports and the Mermaid publishing pipeline utility.
+- 2025-11-18 – Added stress harness trend comparison workflow, S3 smoke test utility, and Mermaid CLI version pinning guidance.

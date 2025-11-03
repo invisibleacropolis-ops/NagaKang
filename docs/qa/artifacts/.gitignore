@@ -1,3 +1,6 @@
 *
 !.gitignore
 !README.md
+!baseline/
+!baseline/stress_results.csv
+!baseline/stress_results.json

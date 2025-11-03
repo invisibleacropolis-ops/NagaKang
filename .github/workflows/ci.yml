@@ -39,7 +39,7 @@ jobs:
           node-version: "20"
 
       - name: Install Mermaid CLI
-        run: npm install -g @mermaid-js/mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli@10.9.0
 
       - name: Lint with ruff
         run: poetry run ruff check .
@@ -56,6 +56,16 @@ jobs:
             --stress-plan docs/qa/stress_plan.json \
             --export-json docs/qa/artifacts/stress_results.json \
             --export-csv docs/qa/artifacts/stress_results.csv
+
+      - name: Compare stress harness trends
+        run: |
+          poetry run python tools/compare_stress_results.py \
+            --baseline-json docs/qa/artifacts/baseline/stress_results.json \
+            --candidate-json docs/qa/artifacts/stress_results.json \
+            --baseline-csv docs/qa/artifacts/baseline/stress_results.csv \
+            --candidate-csv docs/qa/artifacts/stress_results.csv \
+            --summary-path stress_trend_summary.md
+          cat stress_trend_summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload stress harness artifacts
         uses: actions/upload-artifact@v4
