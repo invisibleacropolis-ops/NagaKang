@@ -6,6 +6,7 @@ import csv
 import json
 import math
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -191,6 +192,48 @@ def build_summary(
     return "\n".join(lines) + "\n"
 
 
+def _append_history_json(path: Path, payload: Mapping[str, Any]) -> None:
+    records: list[Mapping[str, Any]] = []
+    if path.exists():
+        existing = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(existing, list):
+            records = list(existing)
+    records.append(dict(payload))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(records, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _append_history_markdown(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    lines = [] if not existing else [existing.rstrip(), ""]
+    timestamp = payload.get("timestamp", "unknown")
+    status = payload.get("status", "unknown")
+    heading = f"## {timestamp} – {status.capitalize()}"
+    lines.append(heading)
+    summary = payload.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        lines.append("")
+        lines.append(summary.strip())
+    issues = payload.get("issues")
+    if isinstance(issues, Sequence) and issues:
+        lines.append("")
+        lines.append("### Issues")
+        for issue in issues:
+            scenario = issue.get("scenario") if isinstance(issue, Mapping) else None
+            metric = issue.get("metric") if isinstance(issue, Mapping) else None
+            message = issue.get("message") if isinstance(issue, Mapping) else None
+            details = ", ".join(
+                str(part)
+                for part in (scenario, metric, message)
+                if part not in (None, "")
+            )
+            if details:
+                lines.append(f"- {details}")
+    lines.append("")
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
 def validate_csv_consistency(
     candidate_json: Mapping[str, Mapping[str, Any]],
     csv_results: Mapping[str, Mapping[str, Any]],
@@ -254,6 +297,12 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline-csv", type=Path, required=True)
     parser.add_argument("--candidate-csv", type=Path, required=True)
     parser.add_argument("--summary-path", type=Path)
+    parser.add_argument("--history-json", type=Path, help="Append run metadata to a JSON history log")
+    parser.add_argument(
+        "--history-markdown",
+        type=Path,
+        help="Append run metadata and summary to a Markdown changelog",
+    )
     parser.add_argument("--abs-tol", type=float, default=1e-4)
     parser.add_argument("--rel-tol", type=float, default=5e-3)
     return parser.parse_args(list(argv) if argv is not None else None)
@@ -274,6 +323,25 @@ def main(argv: Iterable[str] | None = None) -> int:
     if args.summary_path is not None:
         args.summary_path.write_text(summary, encoding="utf-8")
     print(summary)
+
+    status = "success" if not issues else "regression"
+    history_payload = {
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "status": status,
+        "issues": [issue.__dict__ for issue in issues],
+        "summary": summary,
+        "baseline_json": str(args.baseline_json),
+        "candidate_json": str(args.candidate_json),
+        "baseline_csv": str(args.baseline_csv),
+        "candidate_csv": str(args.candidate_csv),
+        "abs_tol": args.abs_tol,
+        "rel_tol": args.rel_tol,
+    }
+
+    if args.history_json is not None:
+        _append_history_json(args.history_json, history_payload)
+    if args.history_markdown is not None:
+        _append_history_markdown(args.history_markdown, history_payload)
 
     return 1 if issues else 0
 

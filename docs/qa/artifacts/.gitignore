@@ -4,3 +4,6 @@
 !baseline/
 !baseline/stress_results.csv
 !baseline/stress_results.json
+!history/
+!history/*.md
+!history/*.json

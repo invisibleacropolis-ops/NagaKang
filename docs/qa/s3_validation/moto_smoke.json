@@ -1,0 +1,38 @@
+{
+  "status": "success",
+  "project_id": "moto-smoke",
+  "bucket": "naga-smoke-moto",
+  "prefix": "projects/",
+  "total_duration_seconds": 0.0435350530000278,
+  "operations": [
+    {
+      "name": "save",
+      "duration_seconds": 0.015981601000021328,
+      "details": {
+        "location": "s3://naga-smoke-moto/projects/moto-smoke.json"
+      }
+    },
+    {
+      "name": "load",
+      "duration_seconds": 0.006575269999984812,
+      "details": {
+        "name": "S3 Smoke Test Project"
+      }
+    },
+    {
+      "name": "list",
+      "duration_seconds": 0.01708414500001254,
+      "details": {
+        "count": 1
+      }
+    },
+    {
+      "name": "delete",
+      "duration_seconds": 0.0038607870000078037,
+      "details": {
+        "removed": true
+      }
+    }
+  ],
+  "error": null
+}

@@ -1,5 +1,20 @@
 # Engineer Log
 
+# Session Summary (Step 2 Trend History & S3 Validation Hardening)
+- Revisited the Comprehensive Development Plan in `README.md` to confirm Step 2 instrumentation, persistence, and documentation touch points before coding.
+- Expanded `tools/compare_stress_results.py` with JSON/Markdown history logging and appended guidance in `docs/qa/artifacts/README.md` plus `docs/qa/artifacts/history/README.md`, capturing a seeded history run to close the final ~3% instrumentation follow-up item. (Instrumentation automation completion: 100%)
+- Hardened `tools/run_s3_smoke_test.py` with moto-based validation, bucket bootstrapping, and automatic `src/` path injection, recording a reference run under `docs/qa/s3_validation/` to finish the remaining ~3% persistence follow-up. (Domain persistence validation completion: ~97% ➜ 100%)
+- Added Puppeteer cache controls to `tools/publish_diagrams.py` and refreshed documentation (`docs/documentation_structure.md`, `docs/step2_architecture_tech_choices.md`) so contributors can operate the pinned Mermaid CLI reliably. (Documentation automation completion: 100%)
+- Ran `poetry run pytest` plus targeted utilities (`tools/compare_stress_results.py` with history logging, `tools/run_s3_smoke_test.py --use-moto`) to validate the new workflows and capture artifacts.
+
+## Outstanding TODOs / Next Session Goals
+1. **Codify Baseline Review Cadence (Remaining ~2%)**
+   - Define how often to inspect history logs, codify tolerance updates, and wire a lightweight checklist into `docs/qa/artifacts/history/` for future regressions.
+2. **Run Smoke Test Against Staging Credentials (Remaining ~2%)**
+   - Coordinate with infrastructure to execute the enhanced smoke test using real S3 credentials, compare timings against the moto baseline, and update rollout notes in `docs/qa/s3_validation/`.
+3. **Persist Mermaid Cache in CI (Remaining ~2%)**
+   - Teach the GitHub Actions workflow to reuse the Puppeteer cache across runs and capture fallback troubleshooting guidance in the docs runbook.
+
 # Session Summary (Step 2 Automation Trend Checks & S3 Validation Prep)
 - Reviewed the Comprehensive Development Plan in `README.md` to reconfirm Step 2 automation and persistence deltas before coding.
 - Committed golden stress harness exports under `docs/qa/artifacts/baseline/` and introduced `tools/compare_stress_results.py`, wiring CI to compare fresh artifacts against the baseline and surface markdown summaries in the workflow report. (Instrumentation automation completion: ~98% ➜ 100%)

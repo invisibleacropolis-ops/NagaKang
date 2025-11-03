@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import json
+
 import pytest
 
 from tools.compare_stress_results import (
@@ -8,6 +10,7 @@ from tools.compare_stress_results import (
     compare_results,
     load_results_csv,
     load_results_json,
+    main,
     validate_csv_consistency,
 )
 
@@ -58,3 +61,38 @@ def test_validate_csv_consistency_flags_missing(tmp_path: Path, baseline_paths: 
 
     issues = validate_csv_consistency(candidate_json, candidate_csv)
     assert any(issue.message.startswith("Scenario missing") for issue in issues)
+
+
+def test_main_appends_history(tmp_path: Path, baseline_paths: tuple[Path, Path], capsys: pytest.CaptureFixture[str]) -> None:
+    baseline_json_path, baseline_csv_path = baseline_paths
+    summary_path = tmp_path / "summary.md"
+    history_json = tmp_path / "history.json"
+    history_markdown = tmp_path / "history.md"
+
+    exit_code = main(
+        [
+            "--baseline-json",
+            str(baseline_json_path),
+            "--candidate-json",
+            str(baseline_json_path),
+            "--baseline-csv",
+            str(baseline_csv_path),
+            "--candidate-csv",
+            str(baseline_csv_path),
+            "--summary-path",
+            str(summary_path),
+            "--history-json",
+            str(history_json),
+            "--history-markdown",
+            str(history_markdown),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert "Stress Harness Trend Check" in captured.out
+    assert exit_code == 0
+
+    history_payload = json.loads(history_json.read_text(encoding="utf-8"))
+    assert history_payload[-1]["status"] == "success"
+    markdown = history_markdown.read_text(encoding="utf-8")
+    assert "Stress Harness Trend Check" in markdown

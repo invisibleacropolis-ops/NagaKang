@@ -90,20 +90,20 @@ The layered overview is visualized in `docs/step2_architecture_diagrams.md`, whi
 - **Complex Serialization:** Start with human-readable formats, introduce binary packing only after establishing automated migration tests.
 
 ## 9. Next Actions
-### Step 2 Progress Update – Session 8
+### Step 2 Progress Update – Session 9
 
-- Added `tools/compare_stress_results.py` and committed golden CSV/JSON exports under `docs/qa/artifacts/baseline/`. CI now runs the helper after regenerating artifacts to compare them against the baseline, surfaces regressions in the job summary, and fails the build on drift.
-- Introduced `tools/run_s3_smoke_test.py`, enabling engineers to provision an `S3ProjectRepository` from environment variables, execute save/load/list/delete operations, and capture latency metrics or Markdown/JSON summaries for deployment runbooks.
-- Pinned Mermaid CLI delivery to a specific version in CI and augmented `tools/publish_diagrams.py` with renderer verification so SVG exports remain deterministic across local and hosted environments.
+- Extended `tools/compare_stress_results.py` with JSON/Markdown history logging so regression investigations include timestamped summaries stored under `docs/qa/artifacts/history/`. Updated the artifact runbook with guidance on baseline refreshes per Plan §9 quality gates.
+- Enhanced `tools/run_s3_smoke_test.py` to support bucket bootstrapping, moto-backed validation, and environment injection without manual `PYTHONPATH` tweaks. Captured representative timings in `docs/qa/s3_validation/moto_smoke.*` to guide future live credential runs (Plan §8 persistence follow-up).
+- Broadened `tools/publish_diagrams.py` with Puppeteer cache configuration to stabilise Mermaid CLI usage across local machines and CI while documenting troubleshooting steps for the pinned renderer (Plan §10 documentation automation).
 
 ### Revised Next Actions
 
-1. **Extend Stress Harness Trend Insights (Remaining ~3% instrumentation follow-up)**
-   - Track historical comparisons or tolerance adjustments in documentation so teams know when to refresh the baseline versus investigate regressions.
-2. **Run Live S3 Validation Against Real Infrastructure (Remaining ~3% persistence follow-up)**
-   - Execute the new smoke test with production-like credentials, record empirical latency in `docs/qa/`, and fold findings into rollout guidance.
-3. **Broaden Diagram Tooling Coverage (Remaining ~3% documentation follow-up)**
-   - Capture the enforced Mermaid CLI version in onboarding docs and explore container images for headless rendering parity across CI providers.
+1. **Schedule Baseline Trend Reviews (Instrumentation follow-up)**
+   - Use the committed history artifacts to define a cadence for reviewing regressions and to codify thresholds for when to refresh the baseline versus investigate anomalies.
+2. **Coordinate Real S3 Smoke Runs (Persistence follow-up)**
+   - Partner with infrastructure to execute `tools/run_s3_smoke_test.py` against staging credentials, capturing reports alongside the moto baseline for comparison and rollout readiness.
+3. **Document Mermaid Cache Strategy in CI (Documentation follow-up)**
+   - Update the CI workflow to persist the Puppeteer cache between runs (artifact or workspace reuse) and document fallback steps if the cache becomes invalid.
 
 These updates keep Step 2 aligned with the Comprehensive Development Plan while clearing the runway for Step 3 module framework development.
 

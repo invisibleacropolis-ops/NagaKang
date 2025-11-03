@@ -1,13 +1,19 @@
 """Utility to exercise the S3 repository adapter using environment credentials."""
 from __future__ import annotations
-
 import argparse
 import json
 import os
+import sys
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, List, Mapping, Optional
+from typing import Any, Iterable, List, Mapping, Optional
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC_PATH = ROOT / "src"
+if str(SRC_PATH) not in sys.path:  # pragma: no cover - import path safeguard
+    sys.path.insert(0, str(SRC_PATH))
 
 from domain.models import InstrumentDefinition, InstrumentModule, Pattern, PatternStep, Project, ProjectMetadata
 from domain.persistence import ProjectFileAdapter
@@ -163,7 +169,86 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--summary-json", type=Path)
     parser.add_argument("--summary-markdown", type=Path)
     parser.add_argument("--keep", action="store_true", help="Keep the remote object instead of deleting it")
+    parser.add_argument("--bucket", type=str, help="Override the target bucket for the smoke test")
+    parser.add_argument("--prefix", type=str, help="Override the object prefix for stored projects")
+    parser.add_argument("--extension", type=str, help="Override the file extension used when persisting projects")
+    parser.add_argument("--endpoint-url", type=str, help="Custom endpoint URL for S3-compatible services")
+    parser.add_argument(
+        "--bootstrap-bucket",
+        action="store_true",
+        help="Create the target bucket before executing the smoke test",
+    )
+    parser.add_argument(
+        "--use-moto",
+        action="store_true",
+        help="Run against an in-memory moto S3 emulator when real credentials are unavailable",
+    )
     return parser.parse_args(list(argv) if argv is not None else None)
+
+
+@contextmanager
+def _maybe_mock_s3(enabled: bool):
+    if not enabled:
+        yield
+        return
+    try:
+        from moto import mock_s3
+        context_manager = mock_s3()
+    except ImportError:
+        try:
+            from moto import mock_aws
+        except ImportError as exc:  # pragma: no cover - optional dependency guard
+            raise ProjectRepositoryError("moto[s3] is required for --use-moto") from exc
+        context_manager = mock_aws()
+    with context_manager:
+        yield
+
+
+def _build_environment(args: argparse.Namespace) -> dict[str, str]:
+    environment = dict(os.environ)
+    if args.bucket:
+        environment["NAGAKANG_S3_BUCKET"] = args.bucket
+    if args.prefix:
+        environment["NAGAKANG_S3_PREFIX"] = args.prefix
+    if args.extension:
+        environment["NAGAKANG_S3_EXTENSION"] = args.extension
+    if args.endpoint_url:
+        environment["NAGAKANG_S3_ENDPOINT_URL"] = args.endpoint_url
+    if args.use_moto:
+        environment.setdefault("NAGAKANG_S3_BUCKET", "naga-smoke-moto")
+        environment.setdefault("AWS_ACCESS_KEY_ID", "mock")
+        environment.setdefault("AWS_SECRET_ACCESS_KEY", "mock")
+        environment.setdefault("AWS_REGION", "us-east-1")
+    return environment
+
+
+def _bootstrap_bucket(environment: Mapping[str, str]) -> None:
+    bucket = environment.get("NAGAKANG_S3_BUCKET")
+    if not bucket:
+        raise ProjectRepositoryError("Bucket must be provided to bootstrap S3 storage")
+    import boto3
+
+    session = boto3.session.Session(
+        aws_access_key_id=environment.get("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=environment.get("AWS_SECRET_ACCESS_KEY"),
+        aws_session_token=environment.get("AWS_SESSION_TOKEN"),
+        region_name=environment.get("AWS_REGION") or environment.get("AWS_DEFAULT_REGION"),
+    )
+    client_kwargs: dict[str, Any] = {}
+    endpoint_url = environment.get("NAGAKANG_S3_ENDPOINT_URL")
+    if endpoint_url:
+        client_kwargs["endpoint_url"] = endpoint_url
+    client = session.client("s3", **client_kwargs)
+    create_kwargs: dict[str, Any] = {"Bucket": bucket}
+    region = session.region_name or environment.get("AWS_REGION") or environment.get("AWS_DEFAULT_REGION")
+    if region and region != "us-east-1":
+        create_kwargs["CreateBucketConfiguration"] = {"LocationConstraint": region}
+    try:
+        client.create_bucket(**create_kwargs)
+    except client.exceptions.BucketAlreadyOwnedByYou:  # type: ignore[attr-defined]
+        return
+    except client.exceptions.BucketAlreadyExists:  # type: ignore[attr-defined]
+        return
 
 
 def main(argv: Iterable[str] | None = None) -> int:
@@ -172,14 +257,26 @@ def main(argv: Iterable[str] | None = None) -> int:
     cache_path.mkdir(parents=True, exist_ok=True)
 
     adapter = ProjectFileAdapter(cache_path)
-    try:
-        repository = S3ProjectRepository.from_environment(adapter)
-    except ProjectRepositoryError as exc:
-        print(f"Failed to configure S3 repository: {exc}")
-        return 1
+    environment = _build_environment(args)
 
-    project = build_sample_project(args.identifier)
-    report = execute_smoke_test(repository, project, cleanup=not args.keep)
+    with _maybe_mock_s3(args.use_moto):
+        if args.bootstrap_bucket:
+            try:
+                _bootstrap_bucket(environment)
+            except ProjectRepositoryError as exc:
+                print(f"Failed to bootstrap bucket: {exc}")
+                return 1
+        try:
+            repository = S3ProjectRepository.from_environment(adapter, env=environment)
+        except ProjectRepositoryError as exc:
+            print(f"Failed to configure S3 repository: {exc}")
+            return 1
+
+        if args.bootstrap_bucket and not args.use_moto:
+            time.sleep(1.0)
+
+        project = build_sample_project(args.identifier)
+        report = execute_smoke_test(repository, project, cleanup=not args.keep)
 
     if args.summary_json:
         args.summary_json.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")

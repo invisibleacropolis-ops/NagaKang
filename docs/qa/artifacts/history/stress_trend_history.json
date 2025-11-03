@@ -1,0 +1,14 @@
+[
+  {
+    "abs_tol": 0.0001,
+    "baseline_csv": "docs/qa/artifacts/baseline/stress_results.csv",
+    "baseline_json": "docs/qa/artifacts/baseline/stress_results.json",
+    "candidate_csv": "docs/qa/artifacts/baseline/stress_results.csv",
+    "candidate_json": "docs/qa/artifacts/baseline/stress_results.json",
+    "issues": [],
+    "rel_tol": 0.005,
+    "status": "success",
+    "summary": "# Stress Harness Trend Check\n\nCompared 3 baseline scenarios against candidate results.\n\n- \u2705 Baseline metrics matched the baseline within tolerance.\n- \u2705 ModerateLoad metrics matched the baseline within tolerance.\n- \u2705 Overloaded metrics matched the baseline within tolerance.\n",
+    "timestamp": "2025-11-03T11:25:31.975036+00:00"
+  }
+]
