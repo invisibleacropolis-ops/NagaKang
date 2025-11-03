@@ -17,44 +17,68 @@ upon.
 - **Offline rendering loop** – `OfflineAudioEngine` renders blocks while applying
   automation events, giving sound designers an immediate way to audition module
   behaviour without real-time drivers.
-- **Starter module** – `SineOscillator` delivers a stereo tone with amplitude and
-  pitch controls, providing a concrete template for subsequent instruments.
+- **Module library growth** – `AmplitudeEnvelope` and `OnePoleLowPass` layer on
+  top of `SineOscillator`, letting musicians sculpt phrases with familiar gate,
+  attack/release, and cutoff controls before heavier DSP lands.
+- **Render loudness helpers** – `audio.metrics` surfaces RMS (per channel) and a
+  lightweight LUFS estimate so setlist curators can check headroom without
+  leaving the notebook workflow.
 
 ## Usage Example
 
 ```python
 from audio.engine import EngineConfig, OfflineAudioEngine
-from audio.modules import SineOscillator
+from audio.modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
 
-engine = OfflineAudioEngine(EngineConfig(sample_rate=48_000, block_size=256))
-lead = SineOscillator("lead", engine.config)
-engine.add_module(lead, as_output=True)
-engine.schedule_parameter_change(
-    module="lead",
-    parameter="amplitude",
-    beats=2.0,
-    value=0.8,
-    source="chorus entry",
-)
-audio = engine.render(2.0)
+config = EngineConfig(sample_rate=48_000, block_size=128)
+engine = OfflineAudioEngine(config)
+osc = SineOscillator("lead", config)
+env = AmplitudeEnvelope("lead_env", config, source=osc)
+filt = OnePoleLowPass("lead_filter", config, source=env)
+engine.add_module(osc)
+engine.add_module(env)
+engine.add_module(filt, as_output=True)
+
+engine.schedule_parameter_change("lead", "amplitude", beats=0.0, value=0.6)
+engine.schedule_parameter_change("lead_env", "gate", beats=0.0, value=0.0)
+engine.schedule_parameter_change("lead_env", "gate", beats=1.0, value=1.0)
+engine.schedule_parameter_change("lead_filter", "cutoff_hz", beats=0.0, value=400.0)
+engine.schedule_parameter_change("lead_filter", "cutoff_hz", beats=3.0, value=4_000.0)
+
+audio = engine.render(4.0)
+
+from audio.metrics import integrated_lufs, rms_dbfs
+
+print(rms_dbfs(audio))
+print(integrated_lufs(audio, sample_rate=config.sample_rate))
 ```
 
 The rendered array can be saved to disk, analysed in notebooks, or piped through
 existing prototypes for quick sound checks.
 
+## Prototype Bridge (Step 3 Focus)
+
+`prototypes/audio_engine_skeleton.py` now exposes
+`AudioEngine.render_with_musician_engine` and a `--musician-demo` CLI flag. The
+bridge spins up the production `OfflineAudioEngine`, applies beat-synced
+automation to the prototype module graph, and prints LUFS/RMS snapshots for
+performers verifying arrangements between rehearsals.
+
 ## Testing & QA
 
 - `tests/test_audio_engine.py` covers tempo conversions, automation ordering,
   and amplitude automation across rendered buffers.
+- `tests/test_audio_modules.py` verifies the envelope/filter chain reacts to
+  beat automation and that loudness metrics stay musician friendly.
 - `tests/test_run_s3_smoke_test.py` adds coverage for the new `.env` loader so QA
   facilitators can run staging checks without shell gymnastics.
 - `poetry run pytest` remains the one-stop validation command.
 
 ## Next Steps
 
-1. Expand the module library (envelopes, filters, samplers) using the
-   `ParameterSpec` conventions so musicians see familiar control names.
-2. Introduce performance meters (RMS, LUFS) on rendered buffers to help artists
-   tune dynamics before hooking up real-time outputs.
-3. Wire the offline engine into the tracker prototype so pattern automation can
-   schedule events in beats/bars without extra conversion utilities.
+1. Expand the module library (samplers, modulation) using the `ParameterSpec`
+   conventions so musicians see familiar control names.
+2. Broaden the loudness toolkit with crest-factor and peak hold displays to
+   complement the RMS/LUFS baseline captured here.
+3. Feed the offline engine metrics back into tracker UI prototypes so rehearsal
+   leaders can audition dynamics without exporting stems.

@@ -1,5 +1,35 @@
 # Engineer Log
 
+# Session Summary (Step 3 Module Library & Metrics Expansion – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to align module
+  priorities with the musician-first backlog before touching code.
+- Added `AmplitudeEnvelope` and `OnePoleLowPass` modules plus RMS/LUFS helpers
+  in the production `audio/` package so performers can sculpt tone and check
+  headroom without leaving notebooks. (Step 3 module library completion: ~15% ➜
+  ~35%)
+- Bridged `OfflineAudioEngine` into `prototypes/audio_engine_skeleton.py`,
+  exposing a beat-synced render path and a `--musician-demo` CLI flag that prints
+  loudness snapshots for rehearsal leads. (Prototype integration completion:
+  0% ➜ ~25%)
+- Authored documentation updates and new test suites covering the module chain,
+  loudness helpers, and prototype bridge so external engineers can follow the
+  musician-focused workflows. (Render metrics + docs completion: 0% ➜ ~40%)
+- Ran `poetry run pytest` to validate the expanded module catalogue, metrics, and
+  prototype integration.
+
+## Outstanding TODOs / Next Session Goals
+1. **Extend Module Palette with Samplers (~35% ➜ 55%)**
+   - Prototype a clip-based sampler module with musician-facing start/length
+     parameters, document layering strategies, and add regression coverage for
+     combined envelope/filter behaviour.
+2. **Surface Loudness Trends in Tracker UI (~40% ➜ 60%)**
+   - Feed the RMS/LUFS helpers into a lightweight notebook or prototype widget
+     so rehearsal directors can compare patterns without exporting stems.
+3. **Prototype Tempo-Aware Pattern Bridge (~25% ➜ 45%)**
+   - Connect the offline engine bridge to the tracker skeleton to schedule
+     automation from pattern data and publish a musician walkthrough for the new
+     flow.
+
 # Session Summary (Step 2 Closure & Step 3 Kickoff – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) to align the final
   Step 2 hardening items with the Step 3 musician-first goals before coding.

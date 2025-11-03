@@ -10,6 +10,7 @@ from prototypes.audio_engine_skeleton import (
     AudioSettings,
     StressTestScenario,
     load_stress_plan,
+    render_musician_demo_patch,
     run_stress_test_scenarios,
 )
 
@@ -127,6 +128,27 @@ def test_multi_stage_automation_creates_distinct_signal_segments():
     assert math.isclose(engine.graph.get_parameter("test_tone_hz") or 0.0, 440.0, rel_tol=1e-6)
 
 
+def test_musician_engine_bridge_uses_beats_for_automation():
+    settings = AudioSettings(block_size=64, channels=1, test_tone_hz=220.0, tempo_bpm=60.0)
+    engine = AudioEngine(settings)
+
+    buffer = engine.render_with_musician_engine(
+        4.0,
+        beat_automation=[(0.0, 220.0), (2.0, None), (3.0, 660.0)],
+    )
+
+    assert buffer.shape == (settings.sample_rate * 4, 1)
+
+    first_section = buffer[: settings.sample_rate]
+    silent_section = buffer[settings.sample_rate * 2 : settings.sample_rate * 3]
+    final_section = buffer[settings.sample_rate * 3 :]
+
+    assert _rms(first_section[:, 0]) > 0.2
+    assert _rms(silent_section[:, 0]) < 1e-3
+    assert _rms(final_section[:, 0]) > 0.2
+    assert engine.metrics.engine_time >= 4.0
+
+
 def test_stress_scenario_runner_exports_csv_and_json(tmp_path):
     scenarios = [
         StressTestScenario(
@@ -187,3 +209,11 @@ def test_load_stress_plan_parses_settings(tmp_path):
     assert scenario.settings.channels == 2
     assert scenario.settings.test_tone_hz == 330.0
     assert scenario.processing_overhead == pytest.approx(0.0005)
+
+
+def test_musician_demo_patch_reports_loudness():
+    settings = AudioSettings(block_size=64, channels=2, test_tone_hz=440.0, tempo_bpm=120.0)
+    metrics = render_musician_demo_patch(settings, 2.0)
+    assert metrics["duration_seconds"] == pytest.approx(2.0)
+    assert metrics["rms_left_dbfs"] < -1.0
+    assert metrics["integrated_lufs"] < -3.0
