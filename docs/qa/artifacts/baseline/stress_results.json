@@ -1,0 +1,50 @@
+[
+  {
+    "scenario": "Baseline",
+    "duration_seconds": 0.5,
+    "processing_overhead_seconds": 0.0,
+    "sample_rate": 48000,
+    "block_size": 256,
+    "channels": 2,
+    "test_tone_hz": 440.0,
+    "processed_blocks": 94,
+    "underruns": 0,
+    "callbacks": 94,
+    "avg_callback_ms": 0.03562064893532608,
+    "p95_callback_ms": 0.05565499999704571,
+    "avg_cpu_load": 0.0067464514626056245,
+    "max_cpu_load": 0.054958312498243345
+  },
+  {
+    "scenario": "ModerateLoad",
+    "duration_seconds": 0.5,
+    "processing_overhead_seconds": 0.0008,
+    "sample_rate": 48000,
+    "block_size": 128,
+    "channels": 2,
+    "test_tone_hz": 440.0,
+    "processed_blocks": 188,
+    "underruns": 0,
+    "callbacks": 188,
+    "avg_callback_ms": 0.9803896808514968,
+    "p95_callback_ms": 1.0353540000096473,
+    "avg_cpu_load": 0.3697763018618737,
+    "max_cpu_load": 0.8009445000034532
+  },
+  {
+    "scenario": "Overloaded",
+    "duration_seconds": 0.25,
+    "processing_overhead_seconds": 0.0025,
+    "sample_rate": 48000,
+    "block_size": 64,
+    "channels": 2,
+    "test_tone_hz": 440.0,
+    "processed_blocks": 188,
+    "underruns": 188,
+    "callbacks": 188,
+    "avg_callback_ms": 2.6950545797872154,
+    "p95_callback_ms": 2.7489349999996193,
+    "avg_cpu_load": 2.032253840425503,
+    "max_cpu_load": 4.122052499994311
+  }
+]

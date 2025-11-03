@@ -334,6 +334,11 @@ class S3ProjectRepository(ProjectRepository):
         except self._missing_exceptions:
             return None
         except Exception as exc:  # pragma: no cover - defensive against provider errors
+            error_response = getattr(exc, "response", {})
+            error = error_response.get("Error") if isinstance(error_response, dict) else None
+            code = error.get("Code") if isinstance(error, dict) else None
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                return None
             raise ProjectRepositoryError("Failed to inspect project metadata in S3") from exc
 
     def _remote_revision(self, key: str) -> Optional[datetime]:

@@ -16,6 +16,8 @@ sounddevice = { version = "^0.4.6", optional = true }
 pytest = "^7.4.0"
 ruff = "^0.4.0"
 mypy = "^1.8.0"
+boto3 = "^1.35.0"
+moto = {version = "^5.0.0", extras = ["s3"]}
 
 [tool.poetry.extras]
 audio = ["sounddevice"]

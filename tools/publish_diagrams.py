@@ -11,10 +11,38 @@ class DiagramPublishError(RuntimeError):
     """Raised when the diagram publishing pipeline encounters an error."""
 
 
+DEFAULT_MERMAID_VERSION = "10.9.0"
+
 def find_mermaid_sources(source_dir: Path) -> List[Path]:
     """Return all Mermaid source files beneath ``source_dir``."""
 
     return sorted(source_dir.rglob("*.mmd"))
+
+
+def _verify_renderer_version(renderer: Sequence[str], expected_version: str) -> str:
+    command = [renderer[0], "--version"]
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except FileNotFoundError as exc:  # pragma: no cover - depends on environment
+        raise DiagramPublishError(f"Renderer command not found: {renderer[0]}") from exc
+    except subprocess.CalledProcessError as exc:  # pragma: no cover - defensive guard
+        stderr = exc.stderr or ""
+        raise DiagramPublishError(
+            f"Failed to query renderer version using {' '.join(command)}: {stderr}"
+        ) from exc
+
+    version_output = (result.stdout or result.stderr or "").strip()
+    if expected_version not in version_output:
+        raise DiagramPublishError(
+            f"Renderer version mismatch: expected {expected_version} but received '{version_output}'"
+        )
+    return version_output
 
 
 def publish_diagrams(
@@ -23,11 +51,14 @@ def publish_diagrams(
     renderer: Sequence[str],
     *,
     dry_run: bool = False,
+    expected_version: str | None = None,
 ) -> List[Path]:
     """Render Mermaid diagrams to SVG using an external renderer command."""
 
     sources = find_mermaid_sources(source_dir)
     outputs: List[Path] = []
+    if not dry_run and expected_version:
+        _verify_renderer_version(renderer, expected_version)
     for source in sources:
         destination_dir = output_dir or source.parent
         destination = destination_dir / f"{source.stem}.svg"
@@ -73,16 +104,33 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Report which files would be generated without invoking the renderer",
     )
+    parser.add_argument(
+        "--expected-version",
+        type=str,
+        default=DEFAULT_MERMAID_VERSION,
+        help="Required Mermaid CLI version (set to empty string to skip)",
+    )
+    parser.add_argument(
+        "--skip-version-check",
+        action="store_true",
+        help="Disable renderer version validation (not recommended outside experiments)",
+    )
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
 def main(argv: Iterable[str] | None = None) -> None:
     args = parse_args(argv)
+    expected_version: str | None
+    if args.skip_version_check or not args.expected_version:
+        expected_version = None
+    else:
+        expected_version = args.expected_version
     outputs = publish_diagrams(
         args.source,
         args.output,
         args.renderer,
         dry_run=args.dry_run,
+        expected_version=expected_version,
     )
     if args.dry_run:
         for path in outputs:

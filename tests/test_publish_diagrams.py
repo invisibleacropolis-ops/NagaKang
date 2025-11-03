@@ -28,6 +28,7 @@ destination.write_text('rendered:' + source.read_text(encoding='utf-8'), encodin
         assets,
         tmp_path / "out",
         [sys.executable, str(renderer)],
+        expected_version=None,
     )
 
     assert outputs == [tmp_path / "out" / "example.svg"]
@@ -43,7 +44,13 @@ def test_find_mermaid_sources_and_dry_run(tmp_path):
     sources = find_mermaid_sources(tmp_path / "assets")
     assert sources == sorted(files)
 
-    outputs = publish_diagrams(tmp_path / "assets", tmp_path / "out", ["mmdc"], dry_run=True)
+    outputs = publish_diagrams(
+        tmp_path / "assets",
+        tmp_path / "out",
+        ["mmdc"],
+        dry_run=True,
+        expected_version=None,
+    )
     assert outputs == [tmp_path / "out" / "a.svg", tmp_path / "out" / "b.svg"]
     for output in outputs:
         assert not output.exists()
