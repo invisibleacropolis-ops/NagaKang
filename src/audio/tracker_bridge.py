@@ -11,7 +11,13 @@ from domain.models import AutomationPoint, InstrumentDefinition, Pattern, Patter
 
 from .engine import EngineConfig, OfflineAudioEngine, TempoMap
 from .metrics import integrated_lufs, rms_dbfs
-from .modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
+from .modules import (
+    AmplitudeEnvelope,
+    ClipSampler,
+    ClipSampleLayer,
+    OnePoleLowPass,
+    SineOscillator,
+)
 
 
 @dataclass
@@ -137,15 +143,38 @@ class PatternPerformanceBridge:
                     sample_key = type_suffix
                 elif "sample_name" in module_def.parameters:
                     sample_key = str(module_def.parameters["sample_name"])
-                if sample_key is None:
+                layers_param = module_def.parameters.get("layers", [])
+                layer_objects: list[ClipSampleLayer] = []
+                if isinstance(layers_param, list):
+                    for layer in layers_param:
+                        if not isinstance(layer, Mapping):
+                            continue
+                        layer_name = str(layer.get("sample_name", sample_key or module_def.id))
+                        if layer_name not in self.sample_library:
+                            raise KeyError(f"Sample '{layer_name}' not found in library")
+                        layer_buffer = np.asarray(self.sample_library[layer_name], dtype=np.float32)
+                        layer_objects.append(
+                            ClipSampleLayer(
+                                sample=layer_buffer,
+                                min_velocity=int(layer.get("min_velocity", 0)),
+                                max_velocity=int(layer.get("max_velocity", 127)),
+                                amplitude_scale=float(layer.get("amplitude_scale", 1.0)),
+                                start_offset_percent=float(layer.get("start_offset_percent", 0.0)),
+                            )
+                        )
+                sample: np.ndarray | None = None
+                if sample_key is None and not layer_objects:
                     sample_key = module_def.id
-                if sample_key not in self.sample_library:
-                    raise KeyError(f"Sample '{sample_key}' not found in library")
-                sample = np.asarray(self.sample_library[sample_key], dtype=np.float32)
+                if sample_key is not None:
+                    if sample_key not in self.sample_library and not layer_objects:
+                        raise KeyError(f"Sample '{sample_key}' not found in library")
+                    if sample_key in self.sample_library:
+                        sample = np.asarray(self.sample_library[sample_key], dtype=np.float32)
                 module = ClipSampler(
                     module_def.id,
                     self.config,
                     sample=sample,
+                    layers=layer_objects,
                     root_midi_note=int(module_def.parameters.get("root_midi_note", 60)),
                     amplitude=float(module_def.parameters.get("amplitude", 1.0)),
                     start_percent=float(module_def.parameters.get("start_percent", 0.0)),
@@ -207,6 +236,7 @@ class PatternPerformanceBridge:
             end_beat = start_beat + max(length_beats, step_duration_beats / 2.0)
             velocity = step.velocity if step.velocity is not None else 100
             gate_value = velocity / 127.0
+            sampler_velocity = max(1, min(127, velocity))
 
             for module_id in envelope_modules:
                 engine.schedule_parameter_change(
@@ -244,6 +274,21 @@ class PatternPerformanceBridge:
                 transpose = self._transpose_for_note(
                     modules[module_id],
                     step.note,
+                )
+                engine.schedule_parameter_change(
+                    module_id,
+                    "velocity",
+                    beats=start_beat,
+                    value=float(sampler_velocity),
+                    source=f"pattern_step_{index}_velocity",
+                )
+                automation_log.append(
+                    {
+                        "module": module_id,
+                        "parameter": "velocity",
+                        "beats": start_beat,
+                        "value": float(sampler_velocity),
+                    }
                 )
                 engine.schedule_parameter_change(
                     module_id,

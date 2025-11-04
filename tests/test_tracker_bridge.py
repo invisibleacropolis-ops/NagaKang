@@ -81,6 +81,7 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
     assert playback.duration_seconds == pytest.approx(tempo.beats_to_seconds(pattern.duration_beats))
     assert any(event["module"] == "sampler" for event in playback.automation_log)
     assert any(event["parameter"] == "gate" for event in playback.automation_log)
+    assert any(event["parameter"] == "velocity" for event in playback.automation_log)
 
     frames_per_beat = int(round(sample_rate * tempo.beats_to_seconds(1.0)))
     first_note = playback.buffer[:frames_per_beat]
