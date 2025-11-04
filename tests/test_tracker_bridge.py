@@ -67,9 +67,9 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
             *[PatternStep() for _ in range(7)],
         ],
         automation={
-            "filter.cutoff_hz": [
-                AutomationPoint(position_beats=0.0, value=1_500.0),
-                AutomationPoint(position_beats=2.0, value=4_500.0),
+            "filter.cutoff_hz|normalized": [
+                AutomationPoint(position_beats=0.0, value=0.15),
+                AutomationPoint(position_beats=2.0, value=0.9),
             ]
         },
     )
@@ -82,6 +82,27 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
     assert any(event["module"] == "sampler" for event in playback.automation_log)
     assert any(event["parameter"] == "gate" for event in playback.automation_log)
     assert any(event["parameter"] == "velocity" for event in playback.automation_log)
+
+    filter_events = [
+        event
+        for event in playback.automation_log
+        if event["module"] == "filter" and event["parameter"] == "cutoff_hz"
+    ]
+    assert len(filter_events) == 2
+    assert [event["beats"] for event in filter_events] == [0.0, 2.0]
+    assert filter_events[0]["lane_metadata"]["mode"] == "normalized"
+    assert filter_events[0]["source_value"] == pytest.approx(0.15)
+    assert filter_events[0]["value"] == pytest.approx(20.0 + (11_980.0 * 0.15))
+    assert filter_events[1]["value"] == pytest.approx(20.0 + (11_980.0 * 0.9))
+
+    sampler_velocity_events = [
+        event
+        for event in playback.automation_log
+        if event["module"] == "sampler" and event["parameter"] == "velocity"
+    ]
+    assert len(sampler_velocity_events) == 2
+    assert {event["beats"] for event in sampler_velocity_events} == {0.0, 2.0}
+    assert {event["value"] for event in sampler_velocity_events} == {100.0, 115.0}
 
     frames_per_beat = int(round(sample_rate * tempo.beats_to_seconds(1.0)))
     first_note = playback.buffer[:frames_per_beat]
@@ -101,3 +122,48 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
     assert len(summaries) >= math.ceil(pattern.duration_beats)
     assert summaries[0]["rms_left_dbfs"] <= 0.0
     assert summaries[0]["integrated_lufs"] <= summaries[0]["rms_left_dbfs"] + 6.0
+
+
+def test_automation_lane_range_and_percent_modes():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=100.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Simple Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.25, "frequency_hz": 220.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_only",
+        name="Automation Only",
+        length_steps=4,
+        automation={
+            "osc.amplitude|percent|range=0.2:0.8": [
+                AutomationPoint(position_beats=0.0, value=50.0),
+                AutomationPoint(position_beats=1.0, value=120.0),
+            ]
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    amplitude_events = [
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc" and event["parameter"] == "amplitude"
+    ]
+    assert [event["beats"] for event in amplitude_events] == [0.0, 1.0]
+    assert amplitude_events[0]["value"] == pytest.approx(0.5)
+    # Value beyond 100 percent should clamp to configured range, then spec clamp at 0.8
+    assert amplitude_events[1]["value"] == pytest.approx(0.8)
+    assert amplitude_events[0]["lane_metadata"]["mode"] == "percent"
+    assert amplitude_events[0]["lane_metadata"]["range"] == (0.2, 0.8)

@@ -352,3 +352,33 @@
 ## Notes
 - Tests: `pytest`
 - Verified `pytest` against domain model scaffolding; see Testing section in final report for output.
+# Session Summary (Step 3 Automation Scaling – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to frame automation
+  improvements around musician-first preview workflows before changing code.
+- Extended `PatternPerformanceBridge` with lane metadata parsing, normalized/
+  percent scaling, and range overrides so tracker notebooks can stay human-
+  friendly while the bridge resolves real engine values. The automation log now
+  echoes the original source value plus metadata for rehearsal audits. (Pattern
+  bridge automation completion: ~62% ➜ ~74%)
+- Updated tracker bridge regression tests to cover simultaneous sampler velocity
+  hits with normalized filter sweeps and percent-based range overrides, ensuring
+  musicians receive predictable dynamics even when layering automation styles.
+- Documented the new automation naming scheme inside
+  `docs/step3_pattern_bridge_walkthrough.md` to orient external engineers and
+  session musicians around the scaling options.
+- Ran `poetry run pytest` to validate the automation scaling behaviour and the
+  existing module/sampler regressions.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~82% ➜ 85%)**
+   - Prototype crossfade curves between velocity layers and capture player-
+     focused listening notes for legato instruments, expanding tests around
+     stacked sampler voices.
+2. **Beat Loudness Visualization in Tracker UI (~65% ➜ 68%)**
+   - Surface the loudness summaries inside the tracker notebook widget with
+     musician-friendly labels and screenshot the rehearsal workflow.
+3. **Pattern Bridge Automation Refinements (~74% ➜ 85%)**
+   - Add smoothing/curve types (e.g., exponential fades) to the lane metadata
+     parser and teach docs/tests how to audit them alongside the normalized
+     ranges.
+

@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, MutableMapping
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping
 
 import numpy as np
 
 from domain.models import AutomationPoint, InstrumentDefinition, Pattern, PatternStep
 
-from .engine import EngineConfig, OfflineAudioEngine, TempoMap
+from .engine import EngineConfig, OfflineAudioEngine, ParameterSpec, TempoMap
 from .metrics import integrated_lufs, rms_dbfs
 from .modules import (
     AmplitudeEnvelope,
@@ -58,7 +58,7 @@ class PatternPerformanceBridge:
 
         automation_log: List[dict[str, object]] = []
         self._schedule_steps(engine, pattern, instrument, modules, automation_log)
-        self._schedule_automation_lanes(engine, pattern, automation_log)
+        self._schedule_automation_lanes(engine, pattern, modules, automation_log)
 
         duration_seconds = self.tempo.beats_to_seconds(pattern.duration_beats)
         buffer = engine.render(duration_seconds)
@@ -325,30 +325,120 @@ class PatternPerformanceBridge:
         self,
         engine: OfflineAudioEngine,
         pattern: Pattern,
+        modules: Mapping[str, SineOscillator | ClipSampler | AmplitudeEnvelope | OnePoleLowPass],
         automation_log: List[dict[str, object]],
     ) -> None:
         for lane, points in pattern.automation.items():
-            if "." not in lane:
+            module_name, parameter_name, metadata = self._parse_lane_metadata(lane)
+            if module_name is None or parameter_name is None:
                 continue
-            module, parameter = lane.split(".", 1)
+            if module_name not in modules:
+                raise KeyError(f"Automation lane references unknown module '{module_name}'")
+            module = modules[module_name]
+            spec = self._resolve_parameter_spec(module, parameter_name)
+            if spec is None:
+                raise KeyError(
+                    f"Automation lane '{lane}' references unknown parameter '{parameter_name}'"
+                )
+            value_mapper = self._automation_value_mapper(spec, metadata)
             for point in points:
                 if not isinstance(point, AutomationPoint):
                     continue
+                resolved_value = value_mapper(point.value)
                 engine.schedule_parameter_change(
-                    module,
-                    parameter,
+                    module_name,
+                    parameter_name,
                     beats=point.position_beats,
-                    value=point.value,
+                    value=resolved_value,
                     source="pattern_automation",
                 )
-                automation_log.append(
-                    {
-                        "module": module,
-                        "parameter": parameter,
-                        "beats": point.position_beats,
-                        "value": point.value,
-                    }
-                )
+                log_entry: dict[str, object] = {
+                    "module": module_name,
+                    "parameter": parameter_name,
+                    "beats": point.position_beats,
+                    "value": resolved_value,
+                }
+                if metadata:
+                    log_entry["lane_metadata"] = metadata
+                log_entry["source_value"] = point.value
+                automation_log.append(log_entry)
+
+    def _parse_lane_metadata(self, lane: str) -> tuple[str | None, str | None, dict[str, object]]:
+        if "." not in lane:
+            return None, None, {}
+        head, parameter_part = lane.split(".", 1)
+        parts = parameter_part.split("|")
+        parameter = parts[0]
+        metadata: dict[str, object] = {}
+        for token in parts[1:]:
+            token = token.strip().lower()
+            if token in {"normalized", "normalised"}:
+                metadata["mode"] = "normalized"
+            elif token in {"raw", "absolute"}:
+                metadata["mode"] = "raw"
+            elif token in {"percent", "percentage"}:
+                metadata["mode"] = "percent"
+            elif token.startswith("range="):
+                _, _, payload = token.partition("=")
+                if ":" in payload:
+                    min_str, _, max_str = payload.partition(":")
+                    try:
+                        metadata["range"] = (float(min_str), float(max_str))
+                    except ValueError:
+                        continue
+        return head, parameter, metadata
+
+    def _resolve_parameter_spec(
+        self,
+        module: SineOscillator | ClipSampler | AmplitudeEnvelope | OnePoleLowPass,
+        parameter: str,
+    ) -> ParameterSpec | None:
+        for spec in module.describe_parameters():
+            if spec.name == parameter:
+                return spec
+        return None
+
+    def _automation_value_mapper(
+        self,
+        spec: ParameterSpec,
+        metadata: Mapping[str, object],
+    ) -> Callable[[float], float | None]:
+        mode = str(metadata.get("mode", "normalized"))
+        range_override = metadata.get("range")
+        if isinstance(range_override, tuple) and len(range_override) == 2:
+            try:
+                min_override = float(range_override[0])
+                max_override = float(range_override[1])
+            except (TypeError, ValueError):
+                min_override = spec.minimum
+                max_override = spec.maximum
+        else:
+            min_override = spec.minimum
+            max_override = spec.maximum
+
+        min_value = min(min_override, max_override)
+        max_value = max(min_override, max_override)
+
+        def clamp_from_spec(value: float | None) -> float | None:
+            return spec.clamp(value)
+
+        if mode == "raw":
+            return lambda raw: clamp_from_spec(float(raw))
+        if mode == "percent":
+            def mapper_percent(raw: float) -> float | None:
+                percent = max(0.0, min(100.0, float(raw))) / 100.0
+                scaled = min_value + (max_value - min_value) * percent
+                return clamp_from_spec(scaled)
+
+            return mapper_percent
+
+        # Default to normalized mapping.
+        def mapper_normalized(raw: float) -> float | None:
+            normalized = max(0.0, min(1.0, float(raw)))
+            scaled = min_value + (max_value - min_value) * normalized
+            return clamp_from_spec(scaled)
+
+        return mapper_normalized
 
     def _beat_frames(self, duration_beats: float) -> List[int]:
         total_beats = int(math.ceil(duration_beats))
