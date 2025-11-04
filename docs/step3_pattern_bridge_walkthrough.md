@@ -104,6 +104,26 @@ musicians how dynamics evolve across the phrase. The automation log now lists
 per-step velocity events alongside gates and retriggers, making it easy to
 double-check how expressive MIDI data mapped into sampler playback.
 
+### Automation lane scaling for musicians
+
+Automation lanes now accept musician-friendly scaling hints baked into the lane
+name so notebooks and tracker UIs can stay normalized while the bridge resolves
+real parameter ranges:
+
+- `module.parameter|normalized` (default) maps values `0.0 ➜ 1.0` into the
+  parameter's declared `ParameterSpec.minimum` ➜ `maximum` range.
+- `module.parameter|percent` treats lane values as `0 ➜ 100` percentages before
+  mapping into the declared range. This is useful when teaching workshop
+  participants with "percentage" vocabulary.
+- `module.parameter|raw` bypasses scaling entirely so advanced users can push
+  absolute numbers straight into the engine.
+- Append `|range=min:max` to clamp the mapped range for that lane (e.g.
+  `filter.cutoff_hz|normalized|range=200:8000`).
+
+The automation log records both the normalized `source_value` and the resolved
+`value`, along with the parsed `lane_metadata`, so rehearsal leads can audit how
+their tracker gestures were translated into engine parameters.
+
 ## Next Steps
 
 - Layer additional sampler voices by instantiating multiple `ClipSampler`
