@@ -17,18 +17,22 @@ upon.
 - **Offline rendering loop** – `OfflineAudioEngine` renders blocks while applying
   automation events, giving sound designers an immediate way to audition module
   behaviour without real-time drivers.
-- **Module library growth** – `AmplitudeEnvelope` and `OnePoleLowPass` layer on
-  top of `SineOscillator`, letting musicians sculpt phrases with familiar gate,
-  attack/release, and cutoff controls before heavier DSP lands.
+- **Module library growth** – `ClipSampler` joins `SineOscillator`,
+  `AmplitudeEnvelope`, and `OnePoleLowPass`, letting musicians audition vocal
+  chops or drum slices alongside tone-shaping envelopes and filters without
+  leaving the engine scaffold.
 - **Render loudness helpers** – `audio.metrics` surfaces RMS (per channel) and a
   lightweight LUFS estimate so setlist curators can check headroom without
   leaving the notebook workflow.
+- **Tracker-aware pattern bridge** – `PatternPerformanceBridge` wires domain
+  patterns into the offline engine, schedules sampler retriggers in beat time,
+  and returns per-beat loudness tables for tracker dashboards.
 
 ## Usage Example
 
 ```python
 from audio.engine import EngineConfig, OfflineAudioEngine
-from audio.modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
+from audio.modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
 
 config = EngineConfig(sample_rate=48_000, block_size=128)
 engine = OfflineAudioEngine(config)
@@ -56,13 +60,48 @@ print(integrated_lufs(audio, sample_rate=config.sample_rate))
 The rendered array can be saved to disk, analysed in notebooks, or piped through
 existing prototypes for quick sound checks.
 
+### Layering with the sampler
+
+```python
+import numpy as np
+
+from audio.modules import ClipSampler
+
+sample = np.sin(2 * np.pi * 220.0 * np.linspace(0, 1, config.sample_rate, dtype=np.float32))
+sample = np.stack([sample, sample], axis=1)
+
+sampler = ClipSampler("vox", config, sample=sample, start_percent=0.2, length_percent=0.4)
+env = AmplitudeEnvelope("vox_env", config, source=sampler, attack_ms=15.0, release_ms=120.0)
+lp = OnePoleLowPass("vox_lp", config, source=env, cutoff_hz=3_200.0)
+
+engine.add_module(sampler)
+engine.add_module(env)
+engine.add_module(lp, as_output=True)
+
+engine.schedule_parameter_change("vox", "retrigger", beats=0.0, value=1.0)
+engine.schedule_parameter_change("vox_env", "gate", beats=0.0, value=1.0)
+engine.schedule_parameter_change("vox_env", "gate", beats=1.0, value=0.0)
+audio = engine.render(2.0)
+```
+
 ## Prototype Bridge (Step 3 Focus)
 
-`prototypes/audio_engine_skeleton.py` now exposes
-`AudioEngine.render_with_musician_engine` and a `--musician-demo` CLI flag. The
-bridge spins up the production `OfflineAudioEngine`, applies beat-synced
-automation to the prototype module graph, and prints LUFS/RMS snapshots for
-performers verifying arrangements between rehearsals.
+`prototypes/audio_engine_skeleton.py` now exposes the existing
+`AudioEngine.render_with_musician_engine`, the new `--musician-demo` tone flag,
+and a tracker-facing `--pattern-demo` CLI flag. The pattern demo spins up the
+production `OfflineAudioEngine`, routes a sampler/envelope/filter chain through
+`PatternPerformanceBridge`, and prints per-beat LUFS/RMS snapshots so rehearsal
+directors can compare dynamics without exporting stems.
+
+Run the tracker demo directly:
+
+```bash
+poetry run python prototypes/audio_engine_skeleton.py --pattern-demo --duration 4 --tempo 128
+```
+
+The CLI prints a beat-by-beat loudness table along with the number of automation
+events scheduled from the pattern definition, making it easy to sanity check
+tracker exports in notebooks.
 
 ## Testing & QA
 

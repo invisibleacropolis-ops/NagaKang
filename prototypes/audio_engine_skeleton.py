@@ -52,6 +52,7 @@ from audio.engine import (
 from audio.metrics import integrated_lufs as musician_integrated_lufs
 from audio.metrics import rms_dbfs as musician_rms_dbfs
 from audio.modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
+from audio.tracker_bridge import PatternPerformanceBridge
 
 
 @dataclass
@@ -589,6 +590,85 @@ def render_musician_demo_patch(settings: AudioSettings, duration_seconds: float)
     }
 
 
+def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
+    """Render a tracker-style pattern through the sampler bridge and summarise loudness."""
+
+    if np is None:
+        raise RuntimeError("NumPy is required for the pattern bridge demo render.")
+
+    from domain.models import AutomationPoint, InstrumentDefinition, InstrumentModule, Pattern, PatternStep
+
+    config = MusicianEngineConfig(
+        sample_rate=settings.sample_rate,
+        block_size=settings.block_size,
+        channels=settings.channels,
+    )
+    tempo = MusicianTempoMap(tempo_bpm=settings.tempo_bpm)
+
+    duration_seconds = 0.75
+    frames = int(duration_seconds * settings.sample_rate)
+    time_axis = np.linspace(0.0, duration_seconds, frames, endpoint=False, dtype=np.float32)
+    base = np.sin(2.0 * np.pi * 180.0 * time_axis, dtype=np.float32)
+    bright = np.sin(2.0 * np.pi * 360.0 * time_axis, dtype=np.float32)
+    fade = np.linspace(1.0, 0.2, frames, dtype=np.float32)
+    sample = np.stack([base * fade, bright * fade], axis=1)
+
+    instrument = InstrumentDefinition(
+        id="demo_sampler",
+        name="Demo Clip",
+        modules=[
+            InstrumentModule(
+                id="sampler",
+                type="clip_sampler:demo",
+                parameters={
+                    "start_percent": 0.1,
+                    "length_percent": 0.5,
+                    "amplitude": 0.85,
+                },
+            ),
+            InstrumentModule(
+                id="env",
+                type="amplitude_envelope",
+                parameters={"attack_ms": 18.0, "release_ms": 140.0},
+                inputs=["sampler"],
+            ),
+            InstrumentModule(
+                id="filter",
+                type="one_pole_low_pass",
+                parameters={"cutoff_hz": 2_800.0},
+                inputs=["env"],
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="demo_pattern",
+        name="Demo Pattern",
+        length_steps=16,
+        steps=[
+            PatternStep(note=60, velocity=100, instrument_id="demo_sampler"),
+            PatternStep(),
+            PatternStep(note=67, velocity=112, instrument_id="demo_sampler", step_effects={"length_beats": 0.75}),
+            *[PatternStep() for _ in range(13)],
+        ],
+        automation={
+            "filter.cutoff_hz": [
+                AutomationPoint(position_beats=0.0, value=1_800.0),
+                AutomationPoint(position_beats=2.0, value=4_800.0),
+            ]
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, sample_library={"demo": sample})
+    playback = bridge.render_pattern(pattern, instrument)
+    loudness = bridge.loudness_trends(playback, beats_per_bucket=1.0)
+    return {
+        "duration_seconds": playback.duration_seconds,
+        "beat_loudness": loudness,
+        "automation_events": playback.automation_log,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the audio engine skeleton prototype")
     parser.add_argument("--duration", type=float, default=1.0, help="How long to run the engine (seconds)")
@@ -615,6 +695,11 @@ def parse_args() -> argparse.Namespace:
         "--musician-demo",
         action="store_true",
         help="Render the Step 3 musician demo patch and print loudness metrics",
+    )
+    parser.add_argument(
+        "--pattern-demo",
+        action="store_true",
+        help="Render the tracker pattern bridge demo and print beat loudness snapshots",
     )
     return parser.parse_args()
 
@@ -656,6 +741,21 @@ def main() -> None:
             metrics["rms_left_dbfs"],
             metrics["rms_right_dbfs"],
             metrics["integrated_lufs"],
+        )
+        return
+    if args.pattern_demo:
+        summary = render_pattern_bridge_demo(settings)
+        for bucket in summary["beat_loudness"]:
+            logger.info(
+                "Pattern beats %.1f–%.1f: RMS L/R %.2f/%.2f dBFS, %.2f LUFS",
+                bucket["start_beat"],
+                bucket["end_beat"],
+                bucket["rms_left_dbfs"],
+                bucket["rms_right_dbfs"],
+                bucket["integrated_lufs"],
+            )
+        logger.info(
+            "Pattern demo automation events: %s", len(summary["automation_events"])  # type: ignore[index]
         )
         return
     engine = AudioEngine(settings=settings)
