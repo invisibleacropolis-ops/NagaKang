@@ -17,10 +17,12 @@ upon.
 - **Offline rendering loop** – `OfflineAudioEngine` renders blocks while applying
   automation events, giving sound designers an immediate way to audition module
   behaviour without real-time drivers.
-- **Module library growth** – `ClipSampler` joins `SineOscillator`,
-  `AmplitudeEnvelope`, and `OnePoleLowPass`, letting musicians audition vocal
-  chops or drum slices alongside tone-shaping envelopes and filters without
-  leaving the engine scaffold.
+- **Module library growth** – `ClipSampler` now supports velocity-aware
+  dynamics, per-note start gestures, and multi-layer sample selection so
+  keyboardists can dig into expressive chops without juggling extra routing.
+  It joins `SineOscillator`, `AmplitudeEnvelope`, and `OnePoleLowPass`, letting
+  musicians audition vocal chops or drum slices alongside tone-shaping
+  envelopes and filters without leaving the engine scaffold.
 - **Render loudness helpers** – `audio.metrics` surfaces RMS (per channel) and a
   lightweight LUFS estimate so setlist curators can check headroom without
   leaving the notebook workflow.
@@ -65,12 +67,26 @@ existing prototypes for quick sound checks.
 ```python
 import numpy as np
 
-from audio.modules import ClipSampler
+from audio.modules import ClipSampler, ClipSampleLayer
 
-sample = np.sin(2 * np.pi * 220.0 * np.linspace(0, 1, config.sample_rate, dtype=np.float32))
-sample = np.stack([sample, sample], axis=1)
+time = np.linspace(0, 1, config.sample_rate, dtype=np.float32)
+base = np.sin(2 * np.pi * 220.0 * time, dtype=np.float32)
+bright = np.sin(2 * np.pi * 440.0 * time, dtype=np.float32)
 
-sampler = ClipSampler("vox", config, sample=sample, start_percent=0.2, length_percent=0.4)
+sampler = ClipSampler(
+    "vox",
+    config,
+    layers=[
+        ClipSampleLayer(sample=np.stack([base, base], axis=1), max_velocity=80, amplitude_scale=0.7),
+        ClipSampleLayer(sample=np.stack([bright, bright], axis=1), min_velocity=81, amplitude_scale=1.1),
+    ],
+    start_percent=0.2,
+    length_percent=0.4,
+)
+sampler.set_parameter("velocity_amplitude_min", 0.3)
+sampler.set_parameter("velocity_amplitude_max", 1.0)
+sampler.set_parameter("velocity_start_offset_percent", 0.25)
+
 env = AmplitudeEnvelope("vox_env", config, source=sampler, attack_ms=15.0, release_ms=120.0)
 lp = OnePoleLowPass("vox_lp", config, source=env, cutoff_hz=3_200.0)
 
@@ -78,11 +94,18 @@ engine.add_module(sampler)
 engine.add_module(env)
 engine.add_module(lp, as_output=True)
 
+engine.schedule_parameter_change("vox", "velocity", beats=0.0, value=60.0)
 engine.schedule_parameter_change("vox", "retrigger", beats=0.0, value=1.0)
 engine.schedule_parameter_change("vox_env", "gate", beats=0.0, value=1.0)
 engine.schedule_parameter_change("vox_env", "gate", beats=1.0, value=0.0)
 audio = engine.render(2.0)
 ```
+
+Use the `velocity` parameter to match incoming MIDI data, tweak
+`velocity_amplitude_min`/`_max` to shape dynamics, and lean on
+`velocity_start_offset_percent` to soften soft hits by skipping into the body
+of the clip. The optional `ClipSampleLayer` list picks the right buffer for each
+velocity range, so a single module can cover soft-to-hard articulations.
 
 ## Prototype Bridge (Step 3 Focus)
 

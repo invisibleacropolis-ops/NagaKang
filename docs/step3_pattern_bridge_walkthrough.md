@@ -9,8 +9,9 @@ pattern grid.
 ## What Landed
 
 - **Clip sampler defaults:** `audio.modules.ClipSampler` exposes start/length
-  gestures, retriggers, and semitone transposition so vocal chops or drum hits
-  can be staged quickly.
+  gestures, velocity-sensitive gain/start offsets, multi-layer sample selection,
+  retriggers, and semitone transposition so vocal chops or drum hits can be
+  staged quickly.
 - **Pattern-aware scheduling:** `audio.tracker_bridge.PatternPerformanceBridge`
   reads `domain.models.Pattern` data, converts step events into beat-aligned
   automation, and reuses the offline engine to produce renders.
@@ -52,7 +53,11 @@ import numpy as np
 
 config = EngineConfig(sample_rate=48_000, block_size=128, channels=2)
 tempo = TempoMap(tempo_bpm=124.0)
-library = {"vox": np.stack([sample_buffer, sample_buffer], axis=1)}
+sample_buffer = np.sin(2 * np.pi * 220.0 * np.linspace(0, 1, config.sample_rate, dtype=np.float32))
+library = {
+    "vox_soft": np.stack([sample_buffer * 0.7, sample_buffer * 0.7], axis=1),
+    "vox_hard": np.stack([sample_buffer, sample_buffer], axis=1),
+}
 
 instrument = InstrumentDefinition(
     id="vox",
@@ -61,7 +66,15 @@ instrument = InstrumentDefinition(
         InstrumentModule(
             id="sampler",
             type="clip_sampler:vox",
-            parameters={"start_percent": 0.2, "length_percent": 0.5},
+            parameters={
+                "start_percent": 0.2,
+                "length_percent": 0.5,
+                "velocity_start_offset_percent": 0.25,
+                "layers": [
+                    {"sample_name": "vox_soft", "max_velocity": 80, "amplitude_scale": 0.75},
+                    {"sample_name": "vox_hard", "min_velocity": 81, "amplitude_scale": 1.1},
+                ],
+            },
         ),
         InstrumentModule(id="env", type="amplitude_envelope", inputs=["sampler"], parameters={"attack_ms": 12.0}),
         InstrumentModule(id="lp", type="one_pole_low_pass", inputs=["env"], parameters={"cutoff_hz": 3_000.0}),
@@ -72,7 +85,12 @@ pattern = Pattern(
     id="vox_pattern",
     name="Vox Pattern",
     length_steps=16,
-    steps=[PatternStep(note=60, velocity=110, instrument_id="vox"), *[PatternStep() for _ in range(15)]],
+    steps=[
+        PatternStep(note=60, velocity=70, instrument_id="vox"),
+        *[PatternStep() for _ in range(7)],
+        PatternStep(note=67, velocity=120, instrument_id="vox"),
+        *[PatternStep() for _ in range(7)],
+    ],
     automation={"lp.cutoff_hz": [AutomationPoint(position_beats=0.0, value=1_600.0), AutomationPoint(position_beats=3.0, value=4_000.0)]},
 )
 
@@ -82,7 +100,9 @@ loudness = bridge.loudness_trends(playback)
 ```
 
 Feed the returned `loudness` table into a notebook plot or tracker UI to show
-musicians how dynamics evolve across the phrase.
+musicians how dynamics evolve across the phrase. The automation log now lists
+per-step velocity events alongside gates and retriggers, making it easy to
+double-check how expressive MIDI data mapped into sampler playback.
 
 ## Next Steps
 

@@ -1,5 +1,38 @@
 # Engineer Log
 
+# Session Summary (Step 3 Velocity-Responsive Sampler – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to anchor the
+  sampler velocity goals in the broader musician-first roadmap before editing
+  code.
+- Extended `audio.modules.ClipSampler` with velocity-tracking parameters,
+  amplitude curves, start-offset gestures, and multi-layer sample support so
+  keyboardists can trigger expressive dynamics from a single module. Added
+  regression tests that cover velocity ramps and layer switching. (Sampler
+  expressiveness completion: ~60% ➜ ~82%)
+- Upgraded `PatternPerformanceBridge` to schedule per-step velocity automation
+  and hydrate layered sampler definitions coming from tracker instruments,
+  ensuring rendered previews match expressive MIDI data. Expanded bridge tests
+  to validate velocity logging. (Pattern bridge automation completion: ~55% ➜
+  ~62%)
+- Refreshed Step 3 documentation to teach musicians and external engineers how
+  to configure velocity curves, map layers, and audit automation logs for
+  expressive sampler playback. (Documentation for sampler layering completion:
+  ~50% ➜ ~75%)
+- Ran `poetry run pytest` to cover the velocity-aware sampler behaviours,
+  tracker bridge updates, and existing module regressions.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~82% ➜ 90%)**
+   - Explore per-layer crossfade controls and capture sound-design examples for
+     legato instruments, extending regression coverage to stacked sampler voices.
+2. **Beat Loudness Visualization in Tracker UI (~65% ➜ 65%)**
+   - Pipe the updated velocity-aware renders into a tracker widget/notebook and
+     document rehearsal workflows with annotated screenshots.
+3. **Pattern Bridge Automation Refinements (~62% ➜ 75%)**
+   - Introduce per-lane scaling/normalisation for automation curves, clarify the
+     mapping rules in docs, and add regression coverage for simultaneous
+     velocity + filter sweeps.
+
 # Session Summary (Step 3 Pattern Bridge & Sampler Layering – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) to ensure the new
   sampler work, loudness summaries, and tracker bridge stayed anchored in the

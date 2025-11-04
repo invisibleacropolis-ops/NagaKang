@@ -3,11 +3,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 
 from .engine import BaseAudioModule, EngineConfig, ParameterSpec
+
+
+@dataclass(frozen=True)
+class ClipSampleLayer:
+    """Velocity-aware sample description used by :class:`ClipSampler`."""
+
+    sample: np.ndarray
+    min_velocity: int = 0
+    max_velocity: int = 127
+    amplitude_scale: float = 1.0
+    start_offset_percent: float = 0.0
+
+    def includes(self, velocity: int) -> bool:
+        return self.min_velocity <= velocity <= self.max_velocity
 
 
 @dataclass
@@ -198,14 +212,15 @@ class OnePoleLowPass(BaseAudioModule):
 
 
 class ClipSampler(BaseAudioModule):
-    """Musician-facing clip sampler with start/length gestures and retriggers."""
+    """Musician-facing clip sampler with velocity gestures and layering."""
 
     def __init__(
         self,
         name: str,
         config: EngineConfig,
         *,
-        sample: np.ndarray,
+        sample: np.ndarray | None = None,
+        layers: Sequence[ClipSampleLayer] | None = None,
         root_midi_note: int = 60,
         amplitude: float = 1.0,
         start_percent: float = 0.0,
@@ -213,23 +228,22 @@ class ClipSampler(BaseAudioModule):
         playback_rate: float = 1.0,
         loop: bool = False,
     ) -> None:
-        if sample.ndim == 1:
-            sample = sample[:, None]
-        if sample.shape[1] == 1 and config.channels > 1:
-            sample = np.repeat(sample, config.channels, axis=1)
-        if sample.shape[1] != config.channels:
-            raise ValueError(
-                "Sample channel count must match engine configuration; "
-                f"received {sample.shape[1]} channels for {config.channels} channel engine"
-            )
-        self._sample = sample.astype(np.float32)
+        if sample is None and not layers:
+            raise ValueError("ClipSampler requires a sample or velocity layers")
+        prepared_layers = self._prepare_layers(config, sample, layers)
+        self._layers = tuple(prepared_layers)
         self._loop = loop
         self._root_midi_note = root_midi_note
         self._clip_start = 0
-        self._clip_end = len(self._sample)
+        self._clip_end = len(self._layers[0].sample)
         self._position = float(self._clip_start)
         self._pending_retrigger = True
         self._window_dirty = True
+        self._velocity_dirty = True
+        self._velocity = 127
+        self._velocity_gain = 1.0
+        self._velocity_start_offset = 0.0
+        self._active_layer = self._layers[0]
         parameters: Iterable[ParameterSpec] = [
             ParameterSpec(
                 name="amplitude",
@@ -291,6 +305,49 @@ class ClipSampler(BaseAudioModule):
                 description="Fire the clip from the configured start on demand (momentary).",
                 musical_context="articulation",
             ),
+            ParameterSpec(
+                name="velocity",
+                display_name="Velocity",
+                default=float(self._velocity),
+                minimum=1.0,
+                maximum=127.0,
+                unit="MIDI",
+                description="Latest MIDI velocity applied from tracker patterns.",
+                musical_context="dynamics",
+            ),
+            ParameterSpec(
+                name="velocity_amplitude_min",
+                display_name="Velocity Min Gain",
+                default=0.35,
+                minimum=0.0,
+                maximum=2.0,
+                unit="×",
+                description="Output gain applied at the softest velocity (relative to Clip Level).",
+                musical_context="dynamics",
+            ),
+            ParameterSpec(
+                name="velocity_amplitude_max",
+                display_name="Velocity Max Gain",
+                default=1.0,
+                minimum=0.0,
+                maximum=2.0,
+                unit="×",
+                description="Output gain applied at the hardest velocity (relative to Clip Level).",
+                musical_context="dynamics",
+            ),
+            ParameterSpec(
+                name="velocity_start_offset_percent",
+                display_name="Velocity Start Offset",
+                default=0.0,
+                minimum=-1.0,
+                maximum=1.0,
+                unit="%",
+                description=(
+                    "Extra start offset applied at the softest velocity; negative values "
+                    "pull harder hits earlier."
+                ),
+                musical_context="phrasing",
+            ),
         ]
         super().__init__(name, config, parameters)
 
@@ -298,17 +355,60 @@ class ClipSampler(BaseAudioModule):
         super().set_parameter(name, value)
         if name in {"start_percent", "length_percent"}:
             self._window_dirty = True
+        if name in {"velocity", "velocity_amplitude_min", "velocity_amplitude_max"}:
+            self._velocity_dirty = True
+        if name in {"velocity", "velocity_start_offset_percent"}:
+            self._window_dirty = True
+        if name == "velocity" and value is not None:
+            self._velocity = int(max(1, min(127, round(value))))
         if name == "retrigger" and value is not None and value > 0.0:
             self._pending_retrigger = True
 
+    def _prepare_layers(
+        self,
+        config: EngineConfig,
+        sample: np.ndarray | None,
+        layers: Sequence[ClipSampleLayer] | None,
+    ) -> list[ClipSampleLayer]:
+        prepared: list[ClipSampleLayer] = []
+        raw_layers = list(layers or [])
+        if sample is not None:
+            raw_layers.insert(0, ClipSampleLayer(sample=sample))
+        if not raw_layers:
+            raise ValueError("No sample data provided for ClipSampler")
+        for layer in raw_layers:
+            buffer = np.asarray(layer.sample, dtype=np.float32)
+            if buffer.ndim == 1:
+                buffer = buffer[:, None]
+            if buffer.shape[1] == 1 and config.channels > 1:
+                buffer = np.repeat(buffer, config.channels, axis=1)
+            if buffer.shape[1] != config.channels:
+                raise ValueError(
+                    "Sample channel count must match engine configuration; "
+                    f"received {buffer.shape[1]} channels for {config.channels} channel engine"
+                )
+            prepared.append(
+                ClipSampleLayer(
+                    sample=buffer,
+                    min_velocity=max(0, int(layer.min_velocity)),
+                    max_velocity=min(127, int(layer.max_velocity)),
+                    amplitude_scale=float(layer.amplitude_scale),
+                    start_offset_percent=float(layer.start_offset_percent),
+                )
+            )
+        prepared.sort(key=lambda layer: (layer.min_velocity, layer.max_velocity))
+        return prepared
+
     def _refresh_window(self) -> None:
-        total_frames = len(self._sample)
-        start_percent = float(self.get_parameter("start_percent") or 0.0)
+        total_frames = len(self._active_layer.sample)
+        base_start = float(self.get_parameter("start_percent") or 0.0)
         length_percent = float(self.get_parameter("length_percent") or 0.0)
         length_percent = min(max(length_percent, 0.0), 1.0)
         clip_frames = max(1, int(round(length_percent * total_frames)))
         max_start = max(0, total_frames - clip_frames)
-        start_frame = int(round(start_percent * max_start))
+        extra_start = self._velocity_start_offset + self._active_layer.start_offset_percent
+        effective_start = min(max(base_start + extra_start, 0.0), 1.0)
+        start_frame = int(round(effective_start * max_start))
         end_frame = min(total_frames, start_frame + clip_frames)
         if end_frame <= start_frame:
             end_frame = min(total_frames, start_frame + 1)
@@ -328,9 +428,9 @@ class ClipSampler(BaseAudioModule):
         index = int(self._position)
         frac = self._position - index
         if index >= self._clip_end - 1:
-            frame = self._sample[self._clip_end - 1]
+            frame = self._active_layer.sample[self._clip_end - 1]
         else:
-            frame = (1.0 - frac) * self._sample[index] + frac * self._sample[index + 1]
+            frame = (1.0 - frac) * self._active_layer.sample[index] + frac * self._active_layer.sample[index + 1]
         self._position += rate
         return frame.astype(np.float32)
 
@@ -338,10 +438,13 @@ class ClipSampler(BaseAudioModule):
         if frames <= 0:
             return np.zeros((0, self.config.channels), dtype=np.float32)
 
+        if self._velocity_dirty:
+            self._update_velocity_mapping()
         if self._window_dirty:
             self._refresh_window()
 
         amplitude = float(self.get_parameter("amplitude") or 0.0)
+        amplitude *= self._velocity_gain * self._active_layer.amplitude_scale
         if amplitude <= 0.0:
             return np.zeros((frames, self.config.channels), dtype=np.float32)
 
@@ -366,8 +469,33 @@ class ClipSampler(BaseAudioModule):
             output[idx] = frame * amplitude
         return output
 
+    def _select_layer(self, velocity: int) -> ClipSampleLayer:
+        for layer in self._layers:
+            if layer.includes(velocity):
+                return layer
+        return self._layers[-1]
+
+    def _update_velocity_mapping(self) -> None:
+        velocity = int(max(0, min(127, self._velocity)))
+        layer = self._select_layer(velocity)
+        if layer is not self._active_layer:
+            self._active_layer = layer
+            self._window_dirty = True
+
+        min_gain = float(self.get_parameter("velocity_amplitude_min") or 0.0)
+        max_gain = float(self.get_parameter("velocity_amplitude_max") or 0.0)
+        velocity_norm = velocity / 127.0 if velocity > 0 else 0.0
+        gain = (min_gain * (1.0 - velocity_norm)) + (max_gain * velocity_norm)
+        self._velocity_gain = float(max(gain, 0.0))
+
+        start_param = float(self.get_parameter("velocity_start_offset_percent") or 0.0)
+        self._velocity_start_offset = (1.0 - velocity_norm) * start_param
+
+        self._velocity_dirty = False
+
 
 __all__ = [
+    "ClipSampleLayer",
     "ClipSampler",
     "AmplitudeEnvelope",
     "OnePoleLowPass",
