@@ -1,5 +1,40 @@
 # Engineer Log
 
+# Session Summary (Step 3 Pattern Bridge & Sampler Layering – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to ensure the new
+  sampler work, loudness summaries, and tracker bridge stayed anchored in the
+  musician-first roadmap before touching code.
+- Added `ClipSampler` to the production module library with retriggers,
+  start/length gestures, and transpose automation plus regression coverage that
+  exercises envelope and filter layering. (Step 3 module library completion:
+  ~35% ➜ ~60%)
+- Surfaced beat-by-beat loudness summaries via `PatternPerformanceBridge`,
+  wiring RMS/LUFS helpers into the new `--pattern-demo` CLI flag so rehearsal
+  leaders can compare dynamics without exports. (Surface loudness trends
+  completion: ~40% ➜ ~65%)
+- Bridged tracker patterns into the offline engine using the new bridge class
+  and sampler chain, expanding prototype coverage and documenting the flow for
+  session musicians. (Prototype tempo-aware pattern bridge completion: ~25% ➜
+  ~55%)
+- Authored `docs/step3_pattern_bridge_walkthrough.md` and refreshed the Step 3
+  framework notes to guide external engineers through sampler layering and the
+  pattern demo workflow.
+- Ran `poetry run pytest` to validate the expanded module catalogue, pattern
+  bridge, and musician-first demos.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~60% ➜ 75%)**
+   - Teach `ClipSampler` to react to velocity with per-note amplitude/start
+     offsets, add multi-layer sample support, and extend tests for stacked
+     instrument graphs.
+2. **Beat Loudness Visualization in Tracker UI (~65% ➜ 80%)**
+   - Pipe `PatternPerformanceBridge.loudness_trends` into a lightweight tracker
+     widget/notebook, capturing screenshots and usage notes for rehearsal leads.
+3. **Pattern Bridge Automation Refinements (~55% ➜ 70%)**
+   - Support per-lane scaling (e.g., normalized cutoff curves), document the
+     mapping rules, and add regression coverage for simultaneous instrument
+     patterns.
+
 # Session Summary (Step 3 Module Library & Metrics Expansion – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) to align module
   priorities with the musician-first backlog before touching code.

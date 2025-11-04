@@ -8,6 +8,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step1_backlog_user_stories.md` – Prioritized user stories with acceptance criteria.
 - `docs/step2_architecture_tech_choices.md` – (New) System architecture decisions, technology evaluations, and integration plans.
 - `docs/step3_audio_engine_framework.md` – Musician-centric kickoff for the Step 3 audio engine and module scaffolding.
+- `docs/step3_pattern_bridge_walkthrough.md` – Pattern bridge flow showing sampler layering, beat loudness tables, and CLI usage for rehearsal prep.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
 - `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
 - `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.

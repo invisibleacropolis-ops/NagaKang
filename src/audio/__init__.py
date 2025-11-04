@@ -8,7 +8,8 @@ from .engine import (
     TempoMap,
 )
 from .metrics import integrated_lufs, rms_dbfs, rms_per_channel
-from .modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
+from .modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
+from .tracker_bridge import PatternPerformanceBridge, PatternPlayback
 
 __all__ = [
     "AutomationEvent",
@@ -18,6 +19,9 @@ __all__ = [
     "ParameterSpec",
     "TempoMap",
     "AmplitudeEnvelope",
+    "ClipSampler",
+    "PatternPerformanceBridge",
+    "PatternPlayback",
     "OnePoleLowPass",
     "SineOscillator",
     "integrated_lufs",

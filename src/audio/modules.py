@@ -197,7 +197,178 @@ class OnePoleLowPass(BaseAudioModule):
         return output
 
 
+class ClipSampler(BaseAudioModule):
+    """Musician-facing clip sampler with start/length gestures and retriggers."""
+
+    def __init__(
+        self,
+        name: str,
+        config: EngineConfig,
+        *,
+        sample: np.ndarray,
+        root_midi_note: int = 60,
+        amplitude: float = 1.0,
+        start_percent: float = 0.0,
+        length_percent: float = 1.0,
+        playback_rate: float = 1.0,
+        loop: bool = False,
+    ) -> None:
+        if sample.ndim == 1:
+            sample = sample[:, None]
+        if sample.shape[1] == 1 and config.channels > 1:
+            sample = np.repeat(sample, config.channels, axis=1)
+        if sample.shape[1] != config.channels:
+            raise ValueError(
+                "Sample channel count must match engine configuration; "
+                f"received {sample.shape[1]} channels for {config.channels} channel engine"
+            )
+        self._sample = sample.astype(np.float32)
+        self._loop = loop
+        self._root_midi_note = root_midi_note
+        self._clip_start = 0
+        self._clip_end = len(self._sample)
+        self._position = float(self._clip_start)
+        self._pending_retrigger = True
+        self._window_dirty = True
+        parameters: Iterable[ParameterSpec] = [
+            ParameterSpec(
+                name="amplitude",
+                display_name="Clip Level",
+                default=amplitude,
+                minimum=0.0,
+                maximum=1.0,
+                unit="",
+                description="Overall clip loudness before envelopes or mixers.",
+                musical_context="dynamics",
+            ),
+            ParameterSpec(
+                name="start_percent",
+                display_name="Clip Start",
+                default=start_percent,
+                minimum=0.0,
+                maximum=1.0,
+                unit="%",
+                description="Where playback begins within the clip (0 = start, 1 = end).",
+                musical_context="phrasing",
+            ),
+            ParameterSpec(
+                name="length_percent",
+                display_name="Clip Length",
+                default=length_percent,
+                minimum=0.0,
+                maximum=1.0,
+                unit="%",
+                description="Portion of the clip to audition (0 = micro-slice, 1 = full clip).",
+                musical_context="arrangement",
+            ),
+            ParameterSpec(
+                name="playback_rate",
+                display_name="Playback Rate",
+                default=playback_rate,
+                minimum=0.0,
+                maximum=8.0,
+                unit="×",
+                description="Speed multiplier before pitch transposition.",
+                musical_context="pitch",
+            ),
+            ParameterSpec(
+                name="transpose_semitones",
+                display_name="Transpose",
+                default=0.0,
+                minimum=-36.0,
+                maximum=36.0,
+                unit="st",
+                description="Semitone shift relative to the clip's root pitch.",
+                musical_context="pitch",
+            ),
+            ParameterSpec(
+                name="retrigger",
+                display_name="Retrigger",
+                default=0.0,
+                minimum=0.0,
+                maximum=1.0,
+                unit="",
+                description="Fire the clip from the configured start on demand (momentary).",
+                musical_context="articulation",
+            ),
+        ]
+        super().__init__(name, config, parameters)
+
+    def set_parameter(self, name: str, value: float | None) -> None:  # type: ignore[override]
+        super().set_parameter(name, value)
+        if name in {"start_percent", "length_percent"}:
+            self._window_dirty = True
+        if name == "retrigger" and value is not None and value > 0.0:
+            self._pending_retrigger = True
+
+    def _refresh_window(self) -> None:
+        total_frames = len(self._sample)
+        start_percent = float(self.get_parameter("start_percent") or 0.0)
+        length_percent = float(self.get_parameter("length_percent") or 0.0)
+        length_percent = min(max(length_percent, 0.0), 1.0)
+        clip_frames = max(1, int(round(length_percent * total_frames)))
+        max_start = max(0, total_frames - clip_frames)
+        start_frame = int(round(start_percent * max_start))
+        end_frame = min(total_frames, start_frame + clip_frames)
+        if end_frame <= start_frame:
+            end_frame = min(total_frames, start_frame + 1)
+        self._clip_start = start_frame
+        self._clip_end = end_frame
+        if not (self._clip_start <= self._position < self._clip_end):
+            self._pending_retrigger = True
+        self._window_dirty = False
+
+    def _next_frame(self, rate: float) -> np.ndarray:
+        if self._position >= self._clip_end:
+            if self._loop:
+                self._position = float(self._clip_start)
+            else:
+                return np.zeros(self.config.channels, dtype=np.float32)
+
+        index = int(self._position)
+        frac = self._position - index
+        if index >= self._clip_end - 1:
+            frame = self._sample[self._clip_end - 1]
+        else:
+            frame = (1.0 - frac) * self._sample[index] + frac * self._sample[index + 1]
+        self._position += rate
+        return frame.astype(np.float32)
+
+    def process(self, frames: int) -> np.ndarray:
+        if frames <= 0:
+            return np.zeros((0, self.config.channels), dtype=np.float32)
+
+        if self._window_dirty:
+            self._refresh_window()
+
+        amplitude = float(self.get_parameter("amplitude") or 0.0)
+        if amplitude <= 0.0:
+            return np.zeros((frames, self.config.channels), dtype=np.float32)
+
+        base_rate = float(self.get_parameter("playback_rate") or 0.0)
+        transpose = float(self.get_parameter("transpose_semitones") or 0.0)
+        if base_rate <= 0.0:
+            return np.zeros((frames, self.config.channels), dtype=np.float32)
+
+        rate = base_rate * (2.0 ** (transpose / 12.0))
+
+        if self._pending_retrigger:
+            self._position = float(self._clip_start)
+            self._pending_retrigger = False
+        # Reset retrigger parameter so a future automation event can fire again.
+        super().set_parameter("retrigger", 0.0)
+
+        output = np.zeros((frames, self.config.channels), dtype=np.float32)
+        for idx in range(frames):
+            frame = self._next_frame(rate)
+            if not frame.any() and not self._loop and self._position >= self._clip_end:
+                break
+            output[idx] = frame * amplitude
+        return output
+
+
 __all__ = [
+    "ClipSampler",
     "AmplitudeEnvelope",
     "OnePoleLowPass",
     "SineOscillator",
