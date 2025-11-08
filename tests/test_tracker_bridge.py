@@ -137,6 +137,7 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
         ("pads", 12.0),
         ("keys", 8.0),
         ("plucked", 6.0),
+        ("vocal", 10.0),
     ],
 )
 def test_sampler_crossfade_defaults_apply_per_family(family, expected):
@@ -487,3 +488,90 @@ def test_automation_lane_smoothing_creates_linear_ramp():
     assert smoothing["previous_value"] == pytest.approx(0.2)
     assert smoothing["window_seconds"] == pytest.approx(0.005, rel=0.2)
     assert smoothing["segments"] >= 3
+
+
+def test_automation_lane_smoothing_respects_segment_override():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=120, channels=2)
+    tempo = TempoMap(tempo_bpm=128.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Segmented Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.2, "frequency_hz": 330.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_segments",
+        name="Automation Segments",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|smooth=8ms:5": [
+                AutomationPoint(position_beats=1.0, value=0.7)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    engine = OfflineAudioEngine(config, tempo=tempo)
+    modules = bridge._instantiate_instrument(engine, instrument)
+    automation_log: list[dict[str, object]] = []
+    bridge._schedule_automation_lanes(engine, pattern, modules, automation_log)
+
+    events = sorted(engine.timeline._events, key=lambda evt: evt.time_seconds)
+    assert len(events) == 5
+    smoothing_entry = automation_log[0]["smoothing"]
+    assert smoothing_entry["segments"] == 5
+    assert smoothing_entry["strategy"] == "linear_ramp"
+
+
+def test_automation_dashboard_rows_surface_metadata():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=120, channels=2)
+    tempo = TempoMap(tempo_bpm=110.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Dashboard Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.25, "frequency_hz": 220.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_dashboard",
+        name="Automation Dashboard",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|smooth=6ms:4": [
+                AutomationPoint(position_beats=1.0, value=0.5)
+            ],
+            "osc.amplitude|percent|range=0.0:1.0": [
+                AutomationPoint(position_beats=1.0, value=80.0)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+    rows = bridge.automation_smoothing_rows(playback)
+
+    assert rows, "Expected smoothing rows to be generated"
+    row = rows[0]
+    assert row["label"] == "osc.amplitude"
+    assert row["applied"] is True
+    assert row["segments"] == 4
+    assert row["strategy"] == "linear_ramp"
+    assert row["sources"]
+    assert row["mode"] == "average"
+    assert row["resolved_values"]

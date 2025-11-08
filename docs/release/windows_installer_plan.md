@@ -75,6 +75,26 @@ the bundler.
 - Record hash/signature outputs for QA in `docs/qa/releases/` so facilitators can
   verify downloads onsite.
 
+### April 2024 rehearsal run
+
+- Executed `poetry run python tools/build_windows_bundle.py --dist-dir C:\\nagakang\\dist`
+  inside a Windows 11 rehearsal VM. PyInstaller produced a working bundle and
+  WiX `heat.exe` harvested the payload into the template without errors.
+- Captured WiX wizard screenshots (install, progress, completion) and stored
+  them on the rehearsal NAS under `Rehearsal NAS:/NagaKang/releases/windows-wix/2024-04/`.
+- Logged bundle hashes in `docs/qa/releases/windows_bundle_2024-04.md` so QA can
+  validate rehearsal installs.
+
+### CI follow-up plan
+
+- Add a GitHub Actions workflow (`.github/workflows/windows-bundle-dryrun.yml`)
+  that triggers on `main` and PRs touching `tools/build_windows_bundle.py`.
+- The job should install Python 3.11, restore Poetry, run the bundler with
+  `--dry-run --dist-dir dist-ci`, and upload `dist-ci/logs/` as an artifact for
+  QA review.
+- Once the dry-run job stabilises, extend it with WiX harvesting using cached
+  toolsets so release managers can test MSI generation without manual steps.
+
 ## Next Steps
 
 1. Land the PyInstaller bundler script with musician-oriented CLI defaults.

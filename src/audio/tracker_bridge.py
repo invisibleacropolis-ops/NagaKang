@@ -147,6 +147,51 @@ class PatternPerformanceBridge:
             )
         return rows
 
+    def automation_smoothing_rows(self, playback: PatternPlayback) -> List[dict[str, object]]:
+        """Summarise automation smoothing metadata for notebook dashboards."""
+
+        rows: List[dict[str, object]] = []
+        for event in playback.automation_log:
+            smoothing = event.get("smoothing")
+            smoothing_sources = event.get("smoothing_sources")
+            if not smoothing and not smoothing_sources:
+                continue
+            label = f"{event['module']}.{event['parameter']}"
+            beat = float(event.get("beats", 0.0))
+            row: dict[str, object] = {
+                "label": label,
+                "beat": beat,
+                "target_value": event.get("value"),
+            }
+            if smoothing:
+                applied = bool(smoothing.get("applied"))
+                window_beats = float(smoothing.get("window_beats", 0.0) or 0.0)
+                window_seconds = float(smoothing.get("window_seconds", 0.0) or 0.0)
+                segments = int(smoothing.get("segments", 0) or 0)
+                previous_value = smoothing.get("previous_value")
+                strategy = str(smoothing.get("strategy", "none"))
+                row.update(
+                    {
+                        "applied": applied,
+                        "window_beats": window_beats,
+                        "window_seconds": window_seconds,
+                        "segments": segments,
+                        "previous_value": previous_value,
+                        "strategy": strategy,
+                    }
+                )
+            if smoothing_sources:
+                row["sources"] = list(smoothing_sources)
+                row["mode"] = event.get("smoothing_mode", "average")
+                row["resolved_values"] = list(event.get("smoothed_values", []))
+                row.setdefault("applied", False)
+            metadata = event.get("lane_metadata")
+            if metadata:
+                row["lane_metadata"] = metadata
+            rows.append(row)
+        rows.sort(key=lambda item: (item["beat"], item["label"]))
+        return rows
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -274,6 +319,8 @@ class PatternPerformanceBridge:
             return 8.0
         if family in {"pluck", "plucked", "guitar", "strum"}:
             return 6.0
+        if family in {"vocal", "vox", "choir", "voice"}:
+            return 10.0
         return None
 
     def _schedule_steps(
@@ -450,6 +497,12 @@ class PatternPerformanceBridge:
                 for event in events
             ]
             smoothing_beats = max(smoothing_beats_candidates) if smoothing_beats_candidates else 0.0
+            segments_override_candidates = [
+                self._metadata_smoothing_segments(event.get("lane_metadata", {}))
+                for event in events
+            ]
+            candidate_values = [value for value in segments_override_candidates if value is not None]
+            segments_override = max(candidate_values) if candidate_values else None
             smoothing_applied = False
             smoothing_info: dict[str, object] | None = None
 
@@ -462,7 +515,7 @@ class PatternPerformanceBridge:
                 window_beats = max(0.0, beat - start_beat)
                 if window_beats > 0.0:
                     window_seconds = self.tempo.beats_to_seconds(window_beats)
-                    segments = max(
+                    default_segments = max(
                         3,
                         int(
                             math.ceil(
@@ -473,6 +526,7 @@ class PatternPerformanceBridge:
                         )
                         + 1,
                     )
+                    segments = segments_override or default_segments
                     step_beats = window_beats / (segments - 1)
                     for idx in range(segments):
                         ratio = idx / (segments - 1)
@@ -510,6 +564,7 @@ class PatternPerformanceBridge:
                         ),
                         "previous_value": previous_value,
                         "strategy": "none",
+                        "segments": segments_override or 0,
                     }
 
             last_values[key] = aggregated_value
@@ -580,6 +635,15 @@ class PatternPerformanceBridge:
                 payload = payload.strip().lower()
                 if not payload:
                     continue
+                segment_override: float | None = None
+                if ":" in payload:
+                    payload, _, segment_payload = payload.partition(":")
+                    segment_payload = segment_payload.strip()
+                    if segment_payload:
+                        try:
+                            segment_override = float(segment_payload)
+                        except ValueError:
+                            segment_override = None
                 try:
                     if payload.endswith("ms"):
                         metadata["smooth_seconds"] = max(0.0, float(payload[:-2]) / 1_000.0)
@@ -591,6 +655,14 @@ class PatternPerformanceBridge:
                         metadata["smooth_beats"] = max(0.0, float(payload[:-4]))
                     else:
                         metadata["smooth_beats"] = max(0.0, float(payload))
+                except ValueError:
+                    continue
+                if segment_override is not None:
+                    metadata["smooth_segments"] = max(3, int(round(segment_override)))
+            elif token.startswith("segments=") or token.startswith("smooth_segments="):
+                _, _, payload = token.partition("=")
+                try:
+                    metadata["smooth_segments"] = max(3, int(round(float(payload))))
                 except ValueError:
                     continue
         return head, parameter, metadata
@@ -697,6 +769,20 @@ class PatternPerformanceBridge:
             except (TypeError, ValueError):
                 pass
         return beats
+
+    def _metadata_smoothing_segments(
+        self, metadata: Mapping[str, object] | None
+    ) -> int | None:
+        if not metadata:
+            return None
+        candidate = metadata.get("smooth_segments") or metadata.get("segments")
+        if candidate is None:
+            return None
+        try:
+            value = int(round(float(candidate)))
+        except (TypeError, ValueError):
+            return None
+        return max(3, value)
 
     def _beat_frames(self, duration_beats: float) -> List[int]:
         total_beats = int(math.ceil(duration_beats))

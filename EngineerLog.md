@@ -1,5 +1,50 @@
 # Engineer Log
 
+# Session Summary (Step 3 Wrap & Step 4 Sequencer Kickoff – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–4 & §9) to anchor the
+  final Step 3 polish and ensure the Step 4 sequencer kickoff aligned with the
+  long-term tracker roadmap before editing code.
+- Captured choir pad comparisons and archived metadata in
+  `docs/assets/audio/README.md`, updated the listening notes with a dedicated
+  `vocal` preset, and taught the bridge to default `instrument_family="vocal"`
+  samplers to a 10-step crossfade. (Sampler expressiveness completion: ~94% ➜
+  ~96%)
+- Extended automation smoothing with segment overrides (`|smooth=5ms:5` and
+  `|smooth_segments=`), exposed the new data via
+  `PatternPerformanceBridge.automation_smoothing_rows`, and refreshed the
+  notebook widgets/docs so dashboards now surface ramp metadata alongside
+  loudness. (Pattern bridge automation completion: ~90% ➜ ~94%)
+- Wired the loudness palette and smoothing badges into the Kivy mock guidance,
+  documented Windows HiDPI checks, and recorded the capture manifest for the
+  rehearsal screenshot pack. (Beat loudness visualisation completion: ~82% ➜
+  ~87%)
+- Executed the Windows bundler on the rehearsal VM, logged hashes/screenshots,
+  and documented the upcoming CI dry-run workflow in
+  `docs/release/windows_installer_plan.md`. (Windows installer enablement
+  completion: ~55% ➜ ~62%)
+- Kicked off Step 4 by introducing `tracker.PatternEditor` with mutation history
+  and range utilities, plus documentation for outside engineers. (Step 4
+  sequencer foundations completion: ~0% ➜ ~10%)
+- Ran `poetry run pytest` to cover the new automation dashboard helpers,
+  sampler defaults, and pattern editor routines.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~96% ➜ 98%)**
+   - Capture gospel choir stab renders, update amplitude heuristics, and extend
+     regression coverage for short-release vocal layers.
+2. **Pattern Bridge Automation Refinements (~94% ➜ 96%)**
+   - Add undo-friendly identifiers to smoothing rows and surface segment counts
+     inside the tracker CLI demo for cross-checks.
+3. **Beat Loudness Visualisation in Tracker UI (~87% ➜ 92%)**
+   - Drop the combined loudness/smoothing dashboard into the interactive Kivy
+     mock and attach the archived Windows HiDPI screenshot to the docs repo.
+4. **Windows Installer Enablement (~62% ➜ 70%)**
+   - Prototype the GitHub Actions dry-run workflow and document artifact review
+     steps for QA.
+5. **Step 4 Sequencer Foundations (~10% ➜ 25%)**
+   - Layer undo/redo scaffolding onto `PatternEditor`, design a playback queue
+     stub, and describe tracker-grid interaction flows in Step 4 docs.
+
 # Session Summary (Step 3 Family Defaults & Automation Smoothing – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) before coding so
   the sampler defaults and automation smoothing stayed rooted in musician-first
