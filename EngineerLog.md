@@ -422,3 +422,38 @@
      parser and teach docs/tests how to audit them alongside the normalized
      ranges.
 
+# Session Summary (Step 3 Loudness Dashboard Polish – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3/§9) to ground the sampler
+  and tracker work in the musician-first milestones before writing code.
+- Added decay-tail regression coverage for `ClipSampler` velocity crossfades and
+  documented recommended velocity bands so string/pad players can glide between
+  layers without tonal jumps. (Sampler expressiveness completion: ~88% ➜ ~91%)
+- Extended `PatternPerformanceBridge` with curve intensity parsing and
+  multi-lane smoothing, keeping tracker automation readable while respecting
+  layered musician gestures. Expanded tracker bridge tests to cover the new
+  maths. (Pattern bridge automation completion: ~82% ➜ ~86%)
+- Published `docs/step3_tracker_notebook_widget.py` and companion guide so
+  rehearsal notebooks can render `tracker_loudness_rows` with colour-coded
+  dynamics for non-technical bandleaders. (Beat loudness visualisation completion:
+  ~70% ➜ ~76%)
+- Bootstrapped the Windows packaging toolchain via
+  `tools/build_windows_bundle.py` and a WiX template skeleton, setting up MSI
+  preparations for the Step 3 release. (Windows installer enablement completion:
+  ~25% ➜ ~40%)
+- Ran `poetry run pytest` to validate the new sampler, tracker bridge, and
+  packaging helpers.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~91% ➜ 94%)**
+   - Capture audio comparisons for strings/pads across the new velocity ranges,
+     and tune crossfade defaults per instrument family.
+2. **Beat Loudness Visualisation in Tracker UI (~76% ➜ 82%)**
+   - Embed the notebook widget styling into the forthcoming tracker UI mock and
+     gather rehearsal quotes for the dynamic grading scheme.
+3. **Pattern Bridge Automation Refinements (~86% ➜ 90%)**
+   - Add per-lane smoothing windows (e.g., 5 ms fades) and expose aggregated
+     metadata in the docs for troubleshooting.
+4. **Windows Installer Enablement (~40% ➜ 55%)**
+   - Document PyInstaller/WiX prerequisites and rehearse the bundler on a
+     Windows VM, capturing screenshots for the installer flow.
+

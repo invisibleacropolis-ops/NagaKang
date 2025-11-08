@@ -241,6 +241,51 @@ def test_sampler_velocity_crossfade_blends_layers():
     assert blend_left > soft_left * 0.1  # crossfade preserved some left channel energy
 
 
+def test_sampler_velocity_crossfade_preserves_decay_tails():
+    config = EngineConfig(sample_rate=24_000, block_size=64, channels=2)
+    engine = OfflineAudioEngine(config)
+
+    frames = config.sample_rate // 2
+    soft = np.zeros((frames, 2), dtype=np.float32)
+    soft[:, 0] = np.linspace(0.9, 0.1, frames, dtype=np.float32)
+    mid = np.zeros((frames, 2), dtype=np.float32)
+    mid[:, 0] = np.linspace(0.4, 0.2, frames, dtype=np.float32)
+    mid[:, 1] = np.linspace(0.2, 0.4, frames, dtype=np.float32)
+    hard = np.zeros((frames, 2), dtype=np.float32)
+    hard[:, 1] = np.linspace(1.1, 0.3, frames, dtype=np.float32)
+
+    sampler = ClipSampler(
+        "clip",
+        config,
+        layers=[
+            ClipSampleLayer(sample=soft, max_velocity=70, amplitude_scale=0.85),
+            ClipSampleLayer(sample=mid, min_velocity=60, max_velocity=105, amplitude_scale=1.0),
+            ClipSampleLayer(sample=hard, min_velocity=106, amplitude_scale=1.15),
+        ],
+        amplitude=0.75,
+    )
+    sampler.set_parameter("velocity_crossfade_width", 12.0)
+    sampler.set_parameter("velocity_amplitude_min", 1.0)
+    sampler.set_parameter("velocity_amplitude_max", 1.0)
+    engine.add_module(sampler, as_output=True)
+
+    engine.schedule_parameter_change("clip", "velocity", beats=0.0, value=65.0)
+    engine.schedule_parameter_change("clip", "retrigger", beats=0.0, value=1.0)
+    engine.schedule_parameter_change("clip", "velocity", beats=1.0, value=112.0)
+    engine.schedule_parameter_change("clip", "retrigger", beats=1.0, value=1.0)
+
+    audio = engine.render(2.0)
+    frames_per_beat = int(round(engine.tempo.beats_to_seconds(1.0) * config.sample_rate))
+    high_note = audio[frames_per_beat : frames_per_beat * 2]
+    tail_window = high_note[-frames_per_beat // 2 :]
+
+    tail_left = float(np.mean(np.abs(tail_window[:, 0])))
+    tail_right = float(np.mean(np.abs(tail_window[:, 1])))
+
+    assert tail_right > tail_left  # harder layer still leans right
+    assert tail_left > 0.05  # mid layer tail stayed present during blend
+    assert tail_left > tail_right * 0.15  # avoid vanishing left channel when fading
+
 def test_render_metrics_report_musician_friendly_numbers():
     config = EngineConfig(sample_rate=48_000, block_size=128, channels=2)
     engine = OfflineAudioEngine(config)

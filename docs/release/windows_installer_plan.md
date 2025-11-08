@@ -35,9 +35,9 @@ without development tooling.
 
 ## Prototype Tasks
 
-- [ ] Add a `tools/build_windows_bundle.py` script that drives PyInstaller using
+- [x] Add a `tools/build_windows_bundle.py` script that drives PyInstaller using
       our `poetry` environment and exports a `dist/nagakang` folder.
-- [ ] Scaffold a WiX `.wxs` template under `tools/packaging/windows/` with
+- [x] Scaffold a WiX `.wxs` template under `tools/packaging/windows/` with
       placeholders for version, product codes, and install directories.
 - [ ] Document environment prerequisites (`choco install wix`, `pip install
       pyinstaller`) in `docs/release/windows_installer_plan.md` once scripts land.
@@ -58,3 +58,13 @@ without development tooling.
 1. Land the PyInstaller bundler script with musician-oriented CLI defaults.
 2. Draft the WiX manifest and smoke-test uninstall/upgrade scenarios.
 3. Hook the new tooling into the release checklist before the Step 3 freeze.
+
+## Usage Notes
+
+- Run `poetry run python tools/build_windows_bundle.py --dry-run` to verify the
+  PyInstaller command before producing artefacts. Remove `--dry-run` for actual
+  bundles. Use `--extra-data path/to/samples=samples` to include curated demo
+  libraries for rehearsal leads.
+- After bundling, feed `dist/nagakang` into `tools/packaging/windows/
+  nagakang_product_template.wxs` by harvesting files with WiX `heat.exe` and
+  compiling via `candle`/`light` once Windows build hosts are available.

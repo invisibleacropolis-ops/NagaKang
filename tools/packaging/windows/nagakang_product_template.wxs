@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX template for the NagaKang Step 3 Windows installer. Replace the GUID
+  placeholders before building production installers.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    UpgradeCode="PUT-GUID-HERE-0000-0000-0000-000000000000"
+    Name="NagaKang"
+    Language="1033"
+    Version="0.3.0"
+    Manufacturer="NagaKang Project"
+    Codepage="1252">
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainApplication" Title="NagaKang" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="NagaKang" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ApplicationFiles">
+      <!--
+        Harvest the PyInstaller bundle into this component group by running
+        heat.exe (WiX) or candle/light pipelines during packaging. Example:
+        heat dir dist\\nagakang /dr INSTALLFOLDER /cg ApplicationFiles ...
+      -->
+    </ComponentGroup>
+  </Fragment>
+</Wix>

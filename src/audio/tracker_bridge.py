@@ -364,7 +364,8 @@ class PatternPerformanceBridge:
         modules: Mapping[str, SineOscillator | ClipSampler | AmplitudeEnvelope | OnePoleLowPass],
         automation_log: List[dict[str, object]],
     ) -> None:
-        for lane, points in pattern.automation.items():
+        pending: dict[tuple[str, str, float], list[dict[str, object]]] = {}
+        for lane_index, (lane, points) in enumerate(pattern.automation.items()):
             module_name, parameter_name, metadata = self._parse_lane_metadata(lane)
             if module_name is None or parameter_name is None:
                 continue
@@ -381,23 +382,66 @@ class PatternPerformanceBridge:
                 if not isinstance(point, AutomationPoint):
                     continue
                 resolved_value = value_mapper(point.value)
-                engine.schedule_parameter_change(
-                    module_name,
-                    parameter_name,
-                    beats=point.position_beats,
-                    value=resolved_value,
-                    source="pattern_automation",
+                key = (module_name, parameter_name, float(point.position_beats))
+                bucket = pending.setdefault(key, [])
+                bucket.append(
+                    {
+                        "module": module_name,
+                        "parameter": parameter_name,
+                        "beats": float(point.position_beats),
+                        "value": resolved_value,
+                        "source_value": point.value,
+                        "lane_metadata": metadata,
+                        "lane_name": lane,
+                        "lane_index": lane_index,
+                    }
                 )
-                log_entry: dict[str, object] = {
-                    "module": module_name,
-                    "parameter": parameter_name,
-                    "beats": point.position_beats,
-                    "value": resolved_value,
-                }
-                if metadata:
-                    log_entry["lane_metadata"] = metadata
-                log_entry["source_value"] = point.value
-                automation_log.append(log_entry)
+
+        for (module_name, parameter_name, beat), events in sorted(
+            pending.items(), key=lambda item: (item[0][2], item[0][0], item[0][1])
+        ):
+            values = [event["value"] for event in events]
+            has_none = any(value is None for value in values)
+            numeric_values = [float(value) for value in values if value is not None]
+            if has_none and not numeric_values:
+                aggregated_value: float | None = None
+            elif has_none:
+                aggregated_value = None
+            elif not numeric_values:
+                aggregated_value = None
+            else:
+                aggregated_value = sum(numeric_values) / len(numeric_values)
+
+            engine.schedule_parameter_change(
+                module_name,
+                parameter_name,
+                beats=beat,
+                value=aggregated_value,
+                source="pattern_automation",
+            )
+
+            events.sort(key=lambda event: (event["lane_index"], event["lane_name"]))
+            log_entry: dict[str, object] = {
+                "module": module_name,
+                "parameter": parameter_name,
+                "beats": beat,
+                "value": aggregated_value,
+            }
+            metadata_payloads = [event["lane_metadata"] for event in events if event["lane_metadata"]]
+            if metadata_payloads:
+                if len(metadata_payloads) == 1:
+                    log_entry["lane_metadata"] = metadata_payloads[0]
+                else:
+                    log_entry["lane_metadata"] = metadata_payloads
+            source_values = [event["source_value"] for event in events]
+            if len(source_values) == 1:
+                log_entry["source_value"] = source_values[0]
+            else:
+                log_entry["source_value"] = source_values
+                log_entry["smoothing_sources"] = [event["lane_name"] for event in events]
+                log_entry["smoothed_values"] = values
+                log_entry["smoothing_mode"] = "average"
+            automation_log.append(log_entry)
 
     def _parse_lane_metadata(self, lane: str) -> tuple[str | None, str | None, dict[str, object]]:
         if "." not in lane:
@@ -425,7 +469,15 @@ class PatternPerformanceBridge:
             elif token.startswith("curve="):
                 _, _, payload = token.partition("=")
                 if payload:
-                    metadata["curve"] = payload.strip().lower()
+                    curve_name, _, intensity_str = payload.partition(":")
+                    curve_name = curve_name.strip().lower()
+                    if curve_name:
+                        metadata["curve"] = curve_name
+                    if intensity_str:
+                        try:
+                            metadata["curve_intensity"] = float(intensity_str)
+                        except ValueError:
+                            continue
         return head, parameter, metadata
 
     def _resolve_parameter_spec(
@@ -463,15 +515,32 @@ class PatternPerformanceBridge:
             return spec.clamp(value)
 
         curve_name = str(metadata.get("curve", "linear")).lower()
+        curve_intensity = metadata.get("curve_intensity")
 
         def apply_curve(normalized: float) -> float:
             normalized = max(0.0, min(1.0, normalized))
             if curve_name in {"exponential", "exp", "ease_in"}:
-                return normalized**2
+                exponent = float(curve_intensity) if curve_intensity is not None else 2.0
+                exponent = max(1e-3, exponent)
+                return normalized**exponent
             if curve_name in {"logarithmic", "log", "ease_out"}:
-                return math.sqrt(normalized)
+                exponent = float(curve_intensity) if curve_intensity is not None else 2.0
+                exponent = max(1e-3, exponent)
+                return normalized ** (1.0 / exponent)
             if curve_name in {"s_curve", "s-curve", "smooth"}:
-                return normalized * normalized * (3.0 - 2.0 * normalized)
+                strength = float(curve_intensity) if curve_intensity is not None else 1.0
+                if strength <= 0.0:
+                    return normalized
+                base = normalized * normalized * (3.0 - 2.0 * normalized)
+                if math.isclose(strength, 1.0, rel_tol=1e-6, abs_tol=1e-6):
+                    return base
+                base = min(max(base, 1e-6), 1.0 - 1e-6)
+                power = max(1e-3, strength)
+                numerator = base**power
+                denominator = numerator + (1.0 - base) ** power
+                if denominator == 0.0:
+                    return base
+                return numerator / denominator
             return normalized
 
         if mode == "raw":
