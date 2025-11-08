@@ -17,11 +17,33 @@ future undo/redo support.
   quick groove experimentation before the playback engine lands.
 - `step_summary(index)` – surfaces lightweight info for UI previews (note,
   velocity, instrument, effects).
+- `undo(steps)` / `redo(steps)` – revert or replay the most recent mutations
+  while exposing `undo_stack` / `redo_stack` so the UI can reflect pending
+  history. Each mutation carries a stable `mutation_id` that ties into the
+  automation smoothing identifiers logged by Step 3.
+- `queue_mutation_preview(queue, mutation, step_duration_beats)` – pushes a
+  playback request into the new `PlaybackQueue` stub so the sequencer can render
+  previews without blocking the main tracker grid.
+
+## PlaybackQueue stub
+
+- `PlaybackQueue.enqueue(mutation, start_beat, duration_beats)` returns a
+  `PlaybackRequest` containing the mutation ID, beat window, and musical data.
+- The stub stores requests in FIFO order, exposing `pop_next()`/`clear()` to let
+  the forthcoming sequencer service stream them into `PatternPerformanceBridge`
+  renders.
+- This structure mirrors the architecture sketches in the Comprehensive Plan
+  (README §4), keeping playback orchestration separate from pattern editing so
+  undo/redo remains instant even while offline renders spin.
 
 ## Next steps
 
-- Extend the editor with undo/redo stacks shared with the forthcoming Kivy UI.
 - Introduce tempo-aware helpers that translate beats into step indices for the
   playback scheduler.
-- Wire pattern mutations into a new sequencer service that synchronises
-  `PatternEditor` with the offline render bridge created in Step 3.
+- Wire `PlaybackQueue` into a sequencer service that streams preview requests to
+  `PatternPerformanceBridge` without blocking the tracker grid.
+- Add mutation batching so grouped edits roll back as a single undo/redo frame,
+  aligning with the workflow guidance in README §4.
+- Sketch tracker-grid interaction flows that map pointer/multi-touch gestures to
+  `PatternEditor` calls, annotate which gestures enqueue playback previews vs.
+  silent edits, and capture those flows in the Step 4 design notebook.

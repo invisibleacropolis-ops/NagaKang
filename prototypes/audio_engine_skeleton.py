@@ -652,7 +652,7 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
             *[PatternStep() for _ in range(13)],
         ],
         automation={
-            "filter.cutoff_hz": [
+            "filter.cutoff_hz|smooth=6ms:5": [
                 AutomationPoint(position_beats=0.0, value=1_800.0),
                 AutomationPoint(position_beats=2.0, value=4_800.0),
             ]
@@ -757,6 +757,32 @@ def main() -> None:
         logger.info(
             "Pattern demo automation events: %s", len(summary["automation_events"])  # type: ignore[index]
         )
+        smoothing_events = [
+            event
+            for event in summary["automation_events"]  # type: ignore[index]
+            if isinstance(event, dict) and event.get("smoothing")
+        ]
+        if smoothing_events:
+            total_segments = 0
+            for event in smoothing_events:
+                smoothing = event.get("smoothing", {})
+                segments = int(smoothing.get("segments", 0))
+                total_segments += max(0, segments)
+                event_id = event.get("event_id") or (
+                    f"{event.get('module')}.{event.get('parameter')}@{float(event.get('beats', 0.0)):.2f}"
+                )
+                window_beats = float(smoothing.get("window_beats", 0.0) or 0.0)
+                state = "applied" if smoothing.get("applied") else "pending"
+                logger.info(
+                    "Smoothing %s: %s segments over %.2f beats (%s)",
+                    event_id,
+                    segments,
+                    window_beats,
+                    state,
+                )
+            logger.info(
+                "Smoothing summary: %s events, %s segments", len(smoothing_events), total_segments
+            )
         return
     engine = AudioEngine(settings=settings)
     engine.start()

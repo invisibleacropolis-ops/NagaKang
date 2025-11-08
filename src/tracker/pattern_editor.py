@@ -11,9 +11,63 @@ from domain.models import Pattern, PatternStep
 class StepMutation:
     """Record describing a single step mutation for auditing or undo."""
 
+    mutation_id: str
     index: int
     previous: PatternStep
     updated: PatternStep
+
+
+@dataclass(frozen=True)
+class PlaybackRequest:
+    """Lightweight playback job used by the upcoming sequencer queue."""
+
+    mutation_id: str
+    index: int
+    start_beat: float
+    duration_beats: float
+    note: int | None
+    velocity: int | None
+    instrument_id: str | None
+
+
+class PlaybackQueue:
+    """In-memory FIFO queue that will drive preview renders in Step 4."""
+
+    def __init__(self) -> None:
+        self._pending: List[PlaybackRequest] = []
+
+    def enqueue(
+        self,
+        mutation: StepMutation,
+        *,
+        start_beat: float,
+        duration_beats: float,
+    ) -> PlaybackRequest:
+        request = PlaybackRequest(
+            mutation_id=mutation.mutation_id,
+            index=mutation.index,
+            start_beat=start_beat,
+            duration_beats=duration_beats,
+            note=mutation.updated.note,
+            velocity=mutation.updated.velocity,
+            instrument_id=mutation.updated.instrument_id,
+        )
+        self._pending.append(request)
+        return request
+
+    def pop_next(self) -> PlaybackRequest | None:
+        if not self._pending:
+            return None
+        return self._pending.pop(0)
+
+    def clear(self) -> None:
+        self._pending.clear()
+
+    def __len__(self) -> int:  # pragma: no cover - simple delegation
+        return len(self._pending)
+
+    def __iter__(self):  # pragma: no cover - iteration sugar
+        return iter(list(self._pending))
 
 
 class PatternEditor:
@@ -22,6 +76,9 @@ class PatternEditor:
     def __init__(self, pattern: Pattern) -> None:
         self._pattern = pattern
         self._history: List[StepMutation] = []
+        self._undo_stack: List[StepMutation] = []
+        self._redo_stack: List[StepMutation] = []
+        self._mutation_counter = 0
         self._ensure_length(pattern.length_steps)
 
     @property
@@ -35,6 +92,18 @@ class PatternEditor:
         """Return the recorded mutations in order of execution."""
 
         return list(self._history)
+
+    @property
+    def undo_stack(self) -> List[StepMutation]:
+        """Return the pending undo mutations (most recent last)."""
+
+        return list(self._undo_stack)
+
+    @property
+    def redo_stack(self) -> List[StepMutation]:
+        """Return the pending redo mutations (most recent last)."""
+
+        return list(self._redo_stack)
 
     def set_step(
         self,
@@ -133,6 +202,45 @@ class PatternEditor:
             "effects": dict(step.step_effects),
         }
 
+    def undo(self, steps: int = 1) -> List[StepMutation]:
+        """Revert the most recent mutations, returning the applied records."""
+
+        undone: List[StepMutation] = []
+        for _ in range(min(max(steps, 0), len(self._undo_stack))):
+            mutation = self._undo_stack.pop()
+            self._pattern.steps[mutation.index] = mutation.previous.model_copy()
+            self._redo_stack.append(mutation)
+            undone.append(mutation)
+        return undone
+
+    def redo(self, steps: int = 1) -> List[StepMutation]:
+        """Reapply the most recently undone mutations in order."""
+
+        replayed: List[StepMutation] = []
+        for _ in range(min(max(steps, 0), len(self._redo_stack))):
+            mutation = self._redo_stack.pop()
+            self._pattern.steps[mutation.index] = mutation.updated.model_copy()
+            self._undo_stack.append(mutation)
+            replayed.append(mutation)
+        return replayed
+
+    def queue_mutation_preview(
+        self,
+        queue: PlaybackQueue,
+        mutation: StepMutation,
+        *,
+        step_duration_beats: float = 0.25,
+        start_beat: float | None = None,
+    ) -> PlaybackRequest:
+        """Push a mutation onto the playback queue for forthcoming previews."""
+
+        start = start_beat if start_beat is not None else mutation.index * step_duration_beats
+        return queue.enqueue(
+            mutation,
+            start_beat=start,
+            duration_beats=step_duration_beats,
+        )
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -141,6 +249,10 @@ class PatternEditor:
             return
         while len(self._pattern.steps) < target_length:
             self._pattern.steps.append(PatternStep())
+
+    def _next_mutation_id(self) -> str:
+        self._mutation_counter += 1
+        return f"mutation_{self._mutation_counter}"
 
     def _get_step(self, index: int) -> PatternStep:
         if index < 0 or index >= self._pattern.length_steps:
@@ -151,8 +263,16 @@ class PatternEditor:
     def _commit(self, index: int, previous: PatternStep, updated: PatternStep) -> None:
         if previous == updated:
             return
+        mutation = StepMutation(
+            mutation_id=self._next_mutation_id(),
+            index=index,
+            previous=previous,
+            updated=updated,
+        )
         self._pattern.steps[index] = updated
-        self._history.append(StepMutation(index=index, previous=previous, updated=updated))
+        self._history.append(mutation)
+        self._undo_stack.append(mutation)
+        self._redo_stack.clear()
 
     def iter_steps(self) -> Iterable[PatternStep]:
         """Yield steps up to the declared pattern length."""

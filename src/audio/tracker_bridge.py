@@ -19,6 +19,29 @@ from .modules import (
     SineOscillator,
 )
 
+_SAMPLER_FAMILY_PROFILES: list[tuple[set[str], dict[str, float]]] = [
+    (
+        {"string", "strings", "pad", "pads", "string_section"},
+        {"velocity_crossfade_width": 12.0},
+    ),
+    (
+        {"keys", "keyboard", "ep", "organ"},
+        {"velocity_crossfade_width": 8.0},
+    ),
+    (
+        {"pluck", "plucked", "guitar", "strum"},
+        {"velocity_crossfade_width": 6.0},
+    ),
+    (
+        {"vocal", "vox", "choir", "voice", "gospel"},
+        {
+            "velocity_crossfade_width": 10.0,
+            "velocity_amplitude_min": 0.48,
+            "velocity_amplitude_max": 1.05,
+        },
+    ),
+]
+
 
 @dataclass
 class PatternPlayback:
@@ -44,6 +67,7 @@ class PatternPerformanceBridge:
         self.config = config
         self.tempo = tempo
         self.sample_library = sample_library or {}
+        self._log_counter = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -163,6 +187,16 @@ class PatternPerformanceBridge:
                 "beat": beat,
                 "target_value": event.get("value"),
             }
+            identifier = event.get("event_id")
+            if identifier:
+                row["event_id"] = identifier
+                row["identifier"] = identifier
+            if "event_index" in event:
+                try:
+                    row["event_index"] = int(event["event_index"])
+                except (TypeError, ValueError):
+                    pass
+            row.setdefault("identifier", label)
             if smoothing:
                 applied = bool(smoothing.get("applied"))
                 window_beats = float(smoothing.get("window_beats", 0.0) or 0.0)
@@ -189,7 +223,13 @@ class PatternPerformanceBridge:
             if metadata:
                 row["lane_metadata"] = metadata
             rows.append(row)
-        rows.sort(key=lambda item: (item["beat"], item["label"]))
+        rows.sort(
+            key=lambda item: (
+                item.get("beat", 0.0),
+                item.get("label", ""),
+                item.get("event_index", 0),
+            )
+        )
         return rows
 
     # ------------------------------------------------------------------
@@ -263,16 +303,7 @@ class PatternPerformanceBridge:
                     playback_rate=float(module_def.parameters.get("playback_rate", 1.0)),
                     loop=bool(module_def.parameters.get("loop", False)),
                 )
-                crossfade_param = module_def.parameters.get("velocity_crossfade_width")
-                if crossfade_param is not None:
-                    module.set_parameter("velocity_crossfade_width", float(crossfade_param))
-                else:
-                    family_raw = module_def.parameters.get("instrument_family")
-                    default_crossfade = self._default_crossfade_width(
-                        str(family_raw) if family_raw is not None else None
-                    )
-                    if default_crossfade is not None:
-                        module.set_parameter("velocity_crossfade_width", default_crossfade)
+                self._apply_sampler_defaults(module, module_def.parameters)
             elif module_type in {"amplitude_envelope", "envelope"}:
                 if not module_def.inputs:
                     raise ValueError("Envelope module requires an input reference")
@@ -307,21 +338,45 @@ class PatternPerformanceBridge:
 
         return modules
 
-    def _default_crossfade_width(self, family: str | None) -> float | None:
+    def _apply_sampler_defaults(
+        self,
+        sampler: ClipSampler,
+        parameters: Mapping[str, object],
+    ) -> None:
+        crossfade_param = parameters.get("velocity_crossfade_width")
+        family_raw = parameters.get("instrument_family")
+        defaults = self._sampler_family_defaults(
+            str(family_raw) if family_raw is not None else None
+        )
+
+        if crossfade_param is not None:
+            sampler.set_parameter("velocity_crossfade_width", float(crossfade_param))
+        elif "velocity_crossfade_width" in defaults:
+            sampler.set_parameter(
+                "velocity_crossfade_width",
+                float(defaults["velocity_crossfade_width"]),
+            )
+
+        for param_name in (
+            "velocity_amplitude_min",
+            "velocity_amplitude_max",
+            "velocity_start_offset_percent",
+        ):
+            if param_name in parameters:
+                sampler.set_parameter(param_name, float(parameters[param_name]))
+            elif param_name in defaults:
+                sampler.set_parameter(param_name, float(defaults[param_name]))
+
+    def _sampler_family_defaults(self, family: str | None) -> dict[str, float]:
         if not family:
-            return None
-        family = family.strip().lower()
-        if not family:
-            return None
-        if family in {"string", "strings", "pad", "pads", "string_section"}:
-            return 12.0
-        if family in {"keys", "keyboard", "ep", "organ"}:
-            return 8.0
-        if family in {"pluck", "plucked", "guitar", "strum"}:
-            return 6.0
-        if family in {"vocal", "vox", "choir", "voice"}:
-            return 10.0
-        return None
+            return {}
+        normalized = family.strip().lower()
+        if not normalized:
+            return {}
+        for aliases, defaults in _SAMPLER_FAMILY_PROFILES:
+            if normalized in aliases:
+                return defaults
+        return {}
 
     def _schedule_steps(
         self,
@@ -353,13 +408,14 @@ class PatternPerformanceBridge:
                     value=gate_value,
                     source=f"pattern_step_{index}_on",
                 )
-                automation_log.append(
+                self._append_log(
+                    automation_log,
                     {
                         "module": module_id,
                         "parameter": "gate",
                         "beats": start_beat,
                         "value": gate_value,
-                    }
+                    },
                 )
                 engine.schedule_parameter_change(
                     module_id,
@@ -368,13 +424,14 @@ class PatternPerformanceBridge:
                     value=0.0,
                     source=f"pattern_step_{index}_off",
                 )
-                automation_log.append(
+                self._append_log(
+                    automation_log,
                     {
                         "module": module_id,
                         "parameter": "gate",
                         "beats": end_beat,
                         "value": 0.0,
-                    }
+                    },
                 )
 
             for module_id in sampler_modules:
@@ -389,13 +446,14 @@ class PatternPerformanceBridge:
                     value=float(sampler_velocity),
                     source=f"pattern_step_{index}_velocity",
                 )
-                automation_log.append(
+                self._append_log(
+                    automation_log,
                     {
                         "module": module_id,
                         "parameter": "velocity",
                         "beats": start_beat,
                         "value": float(sampler_velocity),
-                    }
+                    },
                 )
                 engine.schedule_parameter_change(
                     module_id,
@@ -404,13 +462,14 @@ class PatternPerformanceBridge:
                     value=transpose,
                     source=f"pattern_step_{index}_transpose",
                 )
-                automation_log.append(
+                self._append_log(
+                    automation_log,
                     {
                         "module": module_id,
                         "parameter": "transpose_semitones",
                         "beats": start_beat,
                         "value": transpose,
-                    }
+                    },
                 )
                 engine.schedule_parameter_change(
                     module_id,
@@ -419,13 +478,14 @@ class PatternPerformanceBridge:
                     value=1.0,
                     source=f"pattern_step_{index}_trigger",
                 )
-                automation_log.append(
+                self._append_log(
+                    automation_log,
                     {
                         "module": module_id,
                         "parameter": "retrigger",
                         "beats": start_beat,
                         "value": 1.0,
-                    }
+                    },
                 )
 
     def _schedule_automation_lanes(
@@ -593,7 +653,27 @@ class PatternPerformanceBridge:
             if smoothing_info is not None:
                 smoothing_info["applied"] = smoothing_applied
                 log_entry["smoothing"] = smoothing_info
-            automation_log.append(log_entry)
+            self._append_log(automation_log, log_entry)
+
+    def _append_log(
+        self,
+        automation_log: List[dict[str, object]],
+        payload: Mapping[str, object],
+    ) -> None:
+        entry = dict(payload)
+        try:
+            beats = float(entry.get("beats", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            beats = 0.0
+            entry["beats"] = beats
+        if "event_index" not in entry:
+            entry["event_index"] = len(automation_log)
+        if "event_id" not in entry:
+            self._log_counter += 1
+            module_name = str(entry.get("module", "module"))
+            parameter_name = str(entry.get("parameter", "parameter"))
+            entry["event_id"] = f"{module_name}.{parameter_name}@{beats:.4f}#{self._log_counter}"
+        automation_log.append(entry)
 
     def _parse_lane_metadata(self, lane: str) -> tuple[str | None, str | None, dict[str, object]]:
         if "." not in lane:
