@@ -32,6 +32,14 @@ upon.
   and returns per-beat loudness tables for tracker dashboards. The new
   `tracker_loudness_rows` helper formats those metrics into label/text payloads
   that slot directly into rehearsal notebooks.
+- **Instrument family crossfades** – When tracker instruments tag a sampler with
+  `instrument_family` metadata (strings/pads, keys, or plucked), the bridge now
+  applies musician-tested defaults for `velocity_crossfade_width` so multi-layer
+  programs glide by default even before fine-tuning.
+- **Automation smoothing tokens** – Automation lanes can append `|smooth=5ms`
+  (or `|smooth=0.02beats`) to request a micro fade. The bridge expands those
+  requests into linear ramps across prior values and logs the applied window so
+  facilitators can troubleshoot envelope bumps.
 - **Automation curve metadata** – Tracker lanes can now append
   `|curve=exponential`, `|curve=log`, or `|curve=s_curve` so rehearsal leaders
   can design expressive fades without leaving the normalized lane workflow.
@@ -130,6 +138,10 @@ velocity range, so a single module can cover soft-to-hard articulations.
 
 Capture subjective listening notes during rehearsals and drop them into the
 EngineerLog so upcoming patches can fine-tune the weighting heuristics.
+
+See `docs/qa/audio_velocity_crossfade_listening.md` for direct comparison notes
+from the latest sampler bounce sessions, including LUFS deltas and recommended
+default crossfades for each captured instrument family.
 
 ## Prototype Bridge (Step 3 Focus)
 

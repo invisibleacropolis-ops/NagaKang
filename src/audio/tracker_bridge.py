@@ -204,8 +204,8 @@ class PatternPerformanceBridge:
                 if sample_key is not None:
                     if sample_key not in self.sample_library and not layer_objects:
                         raise KeyError(f"Sample '{sample_key}' not found in library")
-                    if sample_key in self.sample_library:
-                        sample = np.asarray(self.sample_library[sample_key], dtype=np.float32)
+                if sample_key in self.sample_library:
+                    sample = np.asarray(self.sample_library[sample_key], dtype=np.float32)
                 module = ClipSampler(
                     module_def.id,
                     self.config,
@@ -218,6 +218,16 @@ class PatternPerformanceBridge:
                     playback_rate=float(module_def.parameters.get("playback_rate", 1.0)),
                     loop=bool(module_def.parameters.get("loop", False)),
                 )
+                crossfade_param = module_def.parameters.get("velocity_crossfade_width")
+                if crossfade_param is not None:
+                    module.set_parameter("velocity_crossfade_width", float(crossfade_param))
+                else:
+                    family_raw = module_def.parameters.get("instrument_family")
+                    default_crossfade = self._default_crossfade_width(
+                        str(family_raw) if family_raw is not None else None
+                    )
+                    if default_crossfade is not None:
+                        module.set_parameter("velocity_crossfade_width", default_crossfade)
             elif module_type in {"amplitude_envelope", "envelope"}:
                 if not module_def.inputs:
                     raise ValueError("Envelope module requires an input reference")
@@ -251,6 +261,20 @@ class PatternPerformanceBridge:
             engine.add_module(module, as_output=module_def is instrument.modules[-1])
 
         return modules
+
+    def _default_crossfade_width(self, family: str | None) -> float | None:
+        if not family:
+            return None
+        family = family.strip().lower()
+        if not family:
+            return None
+        if family in {"string", "strings", "pad", "pads", "string_section"}:
+            return 12.0
+        if family in {"keys", "keyboard", "ep", "organ"}:
+            return 8.0
+        if family in {"pluck", "plucked", "guitar", "strum"}:
+            return 6.0
+        return None
 
     def _schedule_steps(
         self,
@@ -365,6 +389,7 @@ class PatternPerformanceBridge:
         automation_log: List[dict[str, object]],
     ) -> None:
         pending: dict[tuple[str, str, float], list[dict[str, object]]] = {}
+        last_values: dict[tuple[str, str], float | None] = {}
         for lane_index, (lane, points) in enumerate(pattern.automation.items()):
             module_name, parameter_name, metadata = self._parse_lane_metadata(lane)
             if module_name is None or parameter_name is None:
@@ -412,13 +437,82 @@ class PatternPerformanceBridge:
             else:
                 aggregated_value = sum(numeric_values) / len(numeric_values)
 
-            engine.schedule_parameter_change(
-                module_name,
-                parameter_name,
-                beats=beat,
-                value=aggregated_value,
-                source="pattern_automation",
-            )
+            key = (module_name, parameter_name)
+            if key not in last_values:
+                try:
+                    last_values[key] = modules[module_name].get_parameter(parameter_name)  # type: ignore[arg-type]
+                except KeyError:
+                    last_values[key] = None
+            previous_value = last_values.get(key)
+
+            smoothing_beats_candidates = [
+                self._metadata_smoothing_beats(event.get("lane_metadata", {}))
+                for event in events
+            ]
+            smoothing_beats = max(smoothing_beats_candidates) if smoothing_beats_candidates else 0.0
+            smoothing_applied = False
+            smoothing_info: dict[str, object] | None = None
+
+            if (
+                smoothing_beats > 0.0
+                and aggregated_value is not None
+                and previous_value is not None
+            ):
+                start_beat = max(0.0, beat - smoothing_beats)
+                window_beats = max(0.0, beat - start_beat)
+                if window_beats > 0.0:
+                    window_seconds = self.tempo.beats_to_seconds(window_beats)
+                    segments = max(
+                        3,
+                        int(
+                            math.ceil(
+                                window_seconds
+                                * self.config.sample_rate
+                                / max(self.config.block_size, 1)
+                            )
+                        )
+                        + 1,
+                    )
+                    step_beats = window_beats / (segments - 1)
+                    for idx in range(segments):
+                        ratio = idx / (segments - 1)
+                        event_beat = start_beat + step_beats * idx
+                        value = previous_value + (aggregated_value - previous_value) * ratio
+                        source = "pattern_automation" if idx == segments - 1 else "pattern_automation_smooth"
+                        engine.schedule_parameter_change(
+                            module_name,
+                            parameter_name,
+                            beats=event_beat,
+                            value=value,
+                            source=source,
+                        )
+                    smoothing_applied = True
+                    smoothing_info = {
+                        "window_beats": window_beats,
+                        "window_seconds": window_seconds,
+                        "segments": segments,
+                        "previous_value": previous_value,
+                        "strategy": "linear_ramp",
+                    }
+            if not smoothing_applied:
+                engine.schedule_parameter_change(
+                    module_name,
+                    parameter_name,
+                    beats=beat,
+                    value=aggregated_value,
+                    source="pattern_automation",
+                )
+                if smoothing_beats > 0.0:
+                    smoothing_info = {
+                        "window_beats": min(smoothing_beats, beat if beat > 0 else smoothing_beats),
+                        "window_seconds": self.tempo.beats_to_seconds(
+                            min(smoothing_beats, beat if beat > 0 else smoothing_beats)
+                        ),
+                        "previous_value": previous_value,
+                        "strategy": "none",
+                    }
+
+            last_values[key] = aggregated_value
 
             events.sort(key=lambda event: (event["lane_index"], event["lane_name"]))
             log_entry: dict[str, object] = {
@@ -441,6 +535,9 @@ class PatternPerformanceBridge:
                 log_entry["smoothing_sources"] = [event["lane_name"] for event in events]
                 log_entry["smoothed_values"] = values
                 log_entry["smoothing_mode"] = "average"
+            if smoothing_info is not None:
+                smoothing_info["applied"] = smoothing_applied
+                log_entry["smoothing"] = smoothing_info
             automation_log.append(log_entry)
 
     def _parse_lane_metadata(self, lane: str) -> tuple[str | None, str | None, dict[str, object]]:
@@ -478,6 +575,24 @@ class PatternPerformanceBridge:
                             metadata["curve_intensity"] = float(intensity_str)
                         except ValueError:
                             continue
+            elif token.startswith("smooth=") or token.startswith("smoothing="):
+                _, _, payload = token.partition("=")
+                payload = payload.strip().lower()
+                if not payload:
+                    continue
+                try:
+                    if payload.endswith("ms"):
+                        metadata["smooth_seconds"] = max(0.0, float(payload[:-2]) / 1_000.0)
+                    elif payload.endswith("s"):
+                        metadata["smooth_seconds"] = max(0.0, float(payload[:-1]))
+                    elif payload.endswith("beats"):
+                        metadata["smooth_beats"] = max(0.0, float(payload[:-5]))
+                    elif payload.endswith("beat"):
+                        metadata["smooth_beats"] = max(0.0, float(payload[:-4]))
+                    else:
+                        metadata["smooth_beats"] = max(0.0, float(payload))
+                except ValueError:
+                    continue
         return head, parameter, metadata
 
     def _resolve_parameter_spec(
@@ -562,6 +677,26 @@ class PatternPerformanceBridge:
             return clamp_from_spec(scaled)
 
         return mapper_normalized
+
+    def _metadata_smoothing_beats(self, metadata: Mapping[str, object] | None) -> float:
+        if not metadata:
+            return 0.0
+        beats = 0.0
+        smooth_beats = metadata.get("smooth_beats")
+        if smooth_beats is not None:
+            try:
+                beats = max(beats, float(smooth_beats))
+            except (TypeError, ValueError):
+                pass
+        smooth_seconds = metadata.get("smooth_seconds")
+        if smooth_seconds is not None:
+            try:
+                seconds = float(smooth_seconds)
+                seconds_per_beat = max(self.tempo.beats_to_seconds(1.0), 1e-6)
+                beats = max(beats, seconds / seconds_per_beat)
+            except (TypeError, ValueError):
+                pass
+        return beats
 
     def _beat_frames(self, duration_beats: float) -> List[int]:
         total_beats = int(math.ceil(duration_beats))

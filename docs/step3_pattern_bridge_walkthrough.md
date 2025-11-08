@@ -14,6 +14,11 @@ pattern grid.
   staged quickly. The sampler now blends adjacent layers with
   `velocity_crossfade_width` so legato passages feel natural when sliding across
   dynamic layers.
+- **Instrument-family crossfades:** Tag a sampler module with
+  `instrument_family` (`strings`, `pads`, `keys`, or `plucked`) and the bridge
+  applies the listening-tested default (`12`, `8`, or `6` MIDI steps) for
+  `velocity_crossfade_width`. Musicians still override manually, but the
+  baseline now matches the curated velocity notes in the sampler guide.
 - **Pattern-aware scheduling:** `audio.tracker_bridge.PatternPerformanceBridge`
   reads `domain.models.Pattern` data, converts step events into beat-aligned
   automation, and reuses the offline engine to produce renders.
@@ -134,6 +139,10 @@ real parameter ranges:
   and `s_curve` provides a smooth midpoint-focused transition useful for
   swell-style fades. Add an optional intensity (e.g. `curve=exponential:3.0`) to
   tighten or relax the curvature without rewriting lane data.
+- Append `|smooth=5ms` (or `|smooth=0.02beats`) when a lane should fan out over
+  a micro fade. The bridge schedules a linear ramp from the previous value to
+  the resolved one and logs a `smoothing` payload containing window duration,
+  ramp strategy, and the number of intermediate segments.
 - When multiple lanes collide on the same module parameter and beat, the bridge
   averages their resolved values and logs `smoothing_sources` so notebook UIs
   can show which lanes contributed to a combined move. This prevents double-
@@ -141,7 +150,10 @@ real parameter ranges:
 
 The automation log records both the normalized `source_value` and the resolved
 `value`, along with the parsed `lane_metadata`, so rehearsal leads can audit how
-their tracker gestures were translated into engine parameters.
+their tracker gestures were translated into engine parameters. When smoothing is
+requested the log also carries a `smoothing` dict (window, segments, strategy,
+previous value, and whether the ramp was applied) so facilitators can quickly
+spot automation clashes that were gently massaged during rendering.
 
 ## Next Steps
 

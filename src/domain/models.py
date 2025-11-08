@@ -9,7 +9,7 @@ for persistence and automation workflows.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -61,7 +61,7 @@ class InstrumentModule(BaseModel):
 
     id: str
     type: str
-    parameters: Dict[str, float] = Field(default_factory=dict)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
     inputs: List[str] = Field(default_factory=list)
 
 
