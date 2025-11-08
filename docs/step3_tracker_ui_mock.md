@@ -43,6 +43,39 @@ and future desktop UI remain visually in sync.
 - Column widths: 160 px label column, flexible badge column.
 - Outer container border: `1px solid #d1d1d1`; padding: `8px`.
 
+### Kivy snippet
+
+Embed the palette directly into the mock `kv` file:
+
+```kv
+<LoudnessBadge@BoxLayout>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(32)
+    spacing: dp(8)
+    Label:
+        text: root.label
+        size_hint_x: None
+        width: dp(160)
+        bold: True
+    Label:
+        text: root.badge_text
+        color: 1, 1, 1, 1
+        canvas.before:
+            Color:
+                rgba: root.grade_color
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(8)]
+```
+
+- Drive `grade_color` from the shared palette in
+  `docs/step3_tracker_notebook_widget.py::GRADE_COLORS`.
+- Pair the loudness column with a second `BoxLayout` that lists smoothing badges
+  using the teal/brown colours defined in
+  `docs/step3_tracker_notebook_widget.py::SMOOTHING_COLORS`.
+
 ## Implementation checklist
 
 1. Mirror the notebook helper by mapping `PatternPerformanceBridge.tracker_loudness_rows`
@@ -52,4 +85,6 @@ and future desktop UI remain visually in sync.
 3. Surface the same RMS/LUFS strings to keep rehearsal screenshots and UI mocks
    interchangeable for documentation.
 4. Capture annotated screenshots once the mock is wired so the asset pack can
-   ship alongside the Windows installer preview.
+   ship alongside the Windows installer preview. Store the Windows HiDPI capture
+   under `docs/assets/ui/windows_hidpi_tracker_dashboard.png` for the release
+   playbook.

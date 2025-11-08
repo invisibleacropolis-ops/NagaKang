@@ -18,11 +18,12 @@ heuristics and analysed with `audio.metrics`.
 
 ## Findings
 
-| Family        | Crossfade width | LUFS delta (mid ➜ bold) | Tail balance notes                                         |
-| ------------- | --------------- | ------------------------ | ---------------------------------------------------------- |
-| Strings / Pads | 12              | −1.8 LUFS                | Mid tail remains audible (~18% energy) under bold swells.  |
-| Keys           | 8               | −2.3 LUFS                | Fast riffs stay articulate; crossfade keeps bell partials. |
-| Plucked        | 6               | −2.9 LUFS                | Aggressive strums retain enough sparkle without pumping.   |
+| Family         | Crossfade width | LUFS delta (mid ➜ bold) | Tail balance notes                                                |
+| -------------- | --------------- | ------------------------ | ----------------------------------------------------------------- |
+| Strings / Pads | 12              | −1.8 LUFS                | Mid tail remains audible (~18% energy) under bold swells.         |
+| Keys           | 8               | −2.3 LUFS                | Fast riffs stay articulate; crossfade keeps bell partials.        |
+| Plucked        | 6               | −2.9 LUFS                | Aggressive strums retain enough sparkle without pumping.          |
+| Choir / Vocal  | 10              | −2.1 LUFS                | Choir pad layers stay blended without the string preset's smear. |
 
 ## Recommended defaults
 
@@ -33,9 +34,19 @@ heuristics and analysed with `audio.metrics`.
 - Capture additional renders when adding new sample sets and append them here so
   the defaults continue to reflect real instruments rather than synthetic tests.
 
+## Choir pad comparison notes
+
+- Captures `choir_pad_soft.wav` and `choir_pad_bold.wav` are archived in
+  `docs/assets/audio/README.md` with LUFS metadata and the rehearsal NAS path.
+- The choir set smeared transitions at the 12-step string preset. Dropping to a
+  10-step crossfade restored breathiness without exposing layer boundaries.
+- When stacking strings and choir pads, keep the choir sampler tagged as
+  `instrument_family="vocal"` so the bridge assigns the 10-step width while the
+  string layer retains the wider blend.
+
 ## Next listening pass
 
-- Record choir pads with the same process to verify whether the strings default
-  covers vocal swells or needs a separate preset.
-- Export short audio snippets (48 kHz WAV) into `docs/assets/audio/` during the
-  next session so future engineers can A/B the reference renders quickly.
+- Capture gospel choir stabs (short release, strong transients) to test whether
+  the 10-step preset still holds up or needs per-layer amplitude tweaks.
+- Mirror each render into the secure S3 bucket so remote collaborators can pull
+  comparisons without VPN access.
