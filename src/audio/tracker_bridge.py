@@ -111,6 +111,42 @@ class PatternPerformanceBridge:
             )
         return summaries
 
+    def tracker_loudness_rows(
+        self,
+        playback: PatternPlayback,
+        *,
+        beats_per_bucket: float = 1.0,
+    ) -> List[dict[str, object]]:
+        """Format loudness summaries for tracker-facing widgets."""
+
+        summaries = self.loudness_trends(playback, beats_per_bucket=beats_per_bucket)
+        rows: List[dict[str, object]] = []
+        for summary in summaries:
+            start = float(summary["start_beat"])
+            end = float(summary["end_beat"])
+            rms_left = float(summary["rms_left_dbfs"])
+            rms_right = float(summary["rms_right_dbfs"])
+            lufs_value = float(summary["integrated_lufs"])
+            average_rms = (rms_left + rms_right) / 2.0
+            if average_rms >= -10.0:
+                grade = "bold"
+            elif average_rms >= -18.0:
+                grade = "balanced"
+            else:
+                grade = "soft"
+            rows.append(
+                {
+                    "label": f"Beats {start:.1f}–{end:.1f}",
+                    "start_beat": start,
+                    "end_beat": end,
+                    "average_rms_dbfs": average_rms,
+                    "rms_text": f"{rms_left:.1f}/{rms_right:.1f} dBFS",
+                    "lufs_text": f"{lufs_value:.1f} LUFS",
+                    "dynamic_grade": grade,
+                }
+            )
+        return rows
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -386,6 +422,10 @@ class PatternPerformanceBridge:
                         metadata["range"] = (float(min_str), float(max_str))
                     except ValueError:
                         continue
+            elif token.startswith("curve="):
+                _, _, payload = token.partition("=")
+                if payload:
+                    metadata["curve"] = payload.strip().lower()
         return head, parameter, metadata
 
     def _resolve_parameter_spec(
@@ -422,12 +462,25 @@ class PatternPerformanceBridge:
         def clamp_from_spec(value: float | None) -> float | None:
             return spec.clamp(value)
 
+        curve_name = str(metadata.get("curve", "linear")).lower()
+
+        def apply_curve(normalized: float) -> float:
+            normalized = max(0.0, min(1.0, normalized))
+            if curve_name in {"exponential", "exp", "ease_in"}:
+                return normalized**2
+            if curve_name in {"logarithmic", "log", "ease_out"}:
+                return math.sqrt(normalized)
+            if curve_name in {"s_curve", "s-curve", "smooth"}:
+                return normalized * normalized * (3.0 - 2.0 * normalized)
+            return normalized
+
         if mode == "raw":
             return lambda raw: clamp_from_spec(float(raw))
         if mode == "percent":
             def mapper_percent(raw: float) -> float | None:
                 percent = max(0.0, min(100.0, float(raw))) / 100.0
-                scaled = min_value + (max_value - min_value) * percent
+                curved = apply_curve(percent)
+                scaled = min_value + (max_value - min_value) * curved
                 return clamp_from_spec(scaled)
 
             return mapper_percent
@@ -435,7 +488,8 @@ class PatternPerformanceBridge:
         # Default to normalized mapping.
         def mapper_normalized(raw: float) -> float | None:
             normalized = max(0.0, min(1.0, float(raw)))
-            scaled = min_value + (max_value - min_value) * normalized
+            curved = apply_curve(normalized)
+            scaled = min_value + (max_value - min_value) * curved
             return clamp_from_spec(scaled)
 
         return mapper_normalized

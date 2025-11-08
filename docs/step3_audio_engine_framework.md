@@ -18,9 +18,10 @@ upon.
   automation events, giving sound designers an immediate way to audition module
   behaviour without real-time drivers.
 - **Module library growth** – `ClipSampler` now supports velocity-aware
-  dynamics, per-note start gestures, and multi-layer sample selection so
-  keyboardists can dig into expressive chops without juggling extra routing.
-  It joins `SineOscillator`, `AmplitudeEnvelope`, and `OnePoleLowPass`, letting
+  dynamics, per-note start gestures, multi-layer sample selection, and
+  `velocity_crossfade_width` smoothing so keyboardists can dig into expressive
+  chops without juggling extra routing. It joins `SineOscillator`,
+  `AmplitudeEnvelope`, and `OnePoleLowPass`, letting
   musicians audition vocal chops or drum slices alongside tone-shaping
   envelopes and filters without leaving the engine scaffold.
 - **Render loudness helpers** – `audio.metrics` surfaces RMS (per channel) and a
@@ -28,7 +29,12 @@ upon.
   leaving the notebook workflow.
 - **Tracker-aware pattern bridge** – `PatternPerformanceBridge` wires domain
   patterns into the offline engine, schedules sampler retriggers in beat time,
-  and returns per-beat loudness tables for tracker dashboards.
+  and returns per-beat loudness tables for tracker dashboards. The new
+  `tracker_loudness_rows` helper formats those metrics into label/text payloads
+  that slot directly into rehearsal notebooks.
+- **Automation curve metadata** – Tracker lanes can now append
+  `|curve=exponential`, `|curve=log`, or `|curve=s_curve` so rehearsal leaders
+  can design expressive fades without leaving the normalized lane workflow.
 
 ## Usage Example
 

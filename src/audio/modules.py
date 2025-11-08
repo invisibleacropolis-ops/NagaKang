@@ -234,16 +234,16 @@ class ClipSampler(BaseAudioModule):
         self._layers = tuple(prepared_layers)
         self._loop = loop
         self._root_midi_note = root_midi_note
-        self._clip_start = 0
-        self._clip_end = len(self._layers[0].sample)
-        self._position = float(self._clip_start)
+        self._layer_windows: dict[int, tuple[int, int]] = {}
+        self._layer_positions: dict[int, float] = {}
+        self._layer_weights: dict[int, float] = {0: 1.0}
+        self._layer_mix_scale = self._layers[0].amplitude_scale
         self._pending_retrigger = True
         self._window_dirty = True
         self._velocity_dirty = True
         self._velocity = 127
         self._velocity_gain = 1.0
         self._velocity_start_offset = 0.0
-        self._active_layer = self._layers[0]
         parameters: Iterable[ParameterSpec] = [
             ParameterSpec(
                 name="amplitude",
@@ -348,6 +348,19 @@ class ClipSampler(BaseAudioModule):
                 ),
                 musical_context="phrasing",
             ),
+            ParameterSpec(
+                name="velocity_crossfade_width",
+                display_name="Velocity Crossfade",
+                default=0.0,
+                minimum=0.0,
+                maximum=64.0,
+                unit="MIDI",
+                description=(
+                    "Blend neighbouring velocity layers within this many MIDI steps to smooth "
+                    "legato passages."
+                ),
+                musical_context="dynamics",
+            ),
         ]
         super().__init__(name, config, parameters)
 
@@ -355,7 +368,12 @@ class ClipSampler(BaseAudioModule):
         super().set_parameter(name, value)
         if name in {"start_percent", "length_percent"}:
             self._window_dirty = True
-        if name in {"velocity", "velocity_amplitude_min", "velocity_amplitude_max"}:
+        if name in {
+            "velocity",
+            "velocity_amplitude_min",
+            "velocity_amplitude_max",
+            "velocity_crossfade_width",
+        }:
             self._velocity_dirty = True
         if name in {"velocity", "velocity_start_offset_percent"}:
             self._window_dirty = True
@@ -400,39 +418,62 @@ class ClipSampler(BaseAudioModule):
         return prepared
 
     def _refresh_window(self) -> None:
-        total_frames = len(self._active_layer.sample)
+        active_indices = list(self._layer_weights.keys())
         base_start = float(self.get_parameter("start_percent") or 0.0)
         length_percent = float(self.get_parameter("length_percent") or 0.0)
         length_percent = min(max(length_percent, 0.0), 1.0)
-        clip_frames = max(1, int(round(length_percent * total_frames)))
-        max_start = max(0, total_frames - clip_frames)
-        extra_start = self._velocity_start_offset + self._active_layer.start_offset_percent
-        effective_start = min(max(base_start + extra_start, 0.0), 1.0)
-        start_frame = int(round(effective_start * max_start))
-        end_frame = min(total_frames, start_frame + clip_frames)
-        if end_frame <= start_frame:
-            end_frame = min(total_frames, start_frame + 1)
-        self._clip_start = start_frame
-        self._clip_end = end_frame
-        if not (self._clip_start <= self._position < self._clip_end):
-            self._pending_retrigger = True
+
+        for index in list(self._layer_windows.keys()):
+            if index not in active_indices:
+                self._layer_windows.pop(index, None)
+                self._layer_positions.pop(index, None)
+
+        for index in active_indices:
+            layer = self._layers[index]
+            total_frames = len(layer.sample)
+            clip_frames = max(1, int(round(length_percent * total_frames)))
+            max_start = max(0, total_frames - clip_frames)
+            extra_start = self._velocity_start_offset + layer.start_offset_percent
+            effective_start = min(max(base_start + extra_start, 0.0), 1.0)
+            start_frame = int(round(effective_start * max_start))
+            end_frame = min(total_frames, start_frame + clip_frames)
+            if end_frame <= start_frame:
+                end_frame = min(total_frames, start_frame + 1)
+            self._layer_windows[index] = (start_frame, end_frame)
+            position = self._layer_positions.get(index)
+            if position is None or not (start_frame <= position < end_frame):
+                self._layer_positions[index] = float(start_frame)
         self._window_dirty = False
 
     def _next_frame(self, rate: float) -> np.ndarray:
-        if self._position >= self._clip_end:
-            if self._loop:
-                self._position = float(self._clip_start)
+        output = np.zeros(self.config.channels, dtype=np.float32)
+        silent_layers = 0
+        active_layers = list(self._layer_weights.items())
+        for index, weight in active_layers:
+            start_frame, end_frame = self._layer_windows.get(index, (0, 0))
+            if start_frame >= end_frame:
+                silent_layers += 1
+                continue
+            position = self._layer_positions.get(index, float(start_frame))
+            if position >= end_frame:
+                if self._loop:
+                    position = float(start_frame)
+                else:
+                    self._layer_positions[index] = float(end_frame)
+                    silent_layers += 1
+                    continue
+            int_index = int(position)
+            frac = position - int_index
+            sample = self._layers[index].sample
+            if int_index >= end_frame - 1:
+                frame = sample[end_frame - 1]
             else:
-                return np.zeros(self.config.channels, dtype=np.float32)
-
-        index = int(self._position)
-        frac = self._position - index
-        if index >= self._clip_end - 1:
-            frame = self._active_layer.sample[self._clip_end - 1]
-        else:
-            frame = (1.0 - frac) * self._active_layer.sample[index] + frac * self._active_layer.sample[index + 1]
-        self._position += rate
-        return frame.astype(np.float32)
+                frame = (1.0 - frac) * sample[int_index] + frac * sample[int_index + 1]
+            self._layer_positions[index] = position + rate
+            output += frame.astype(np.float32) * weight
+        if not self._loop and silent_layers == len(active_layers):
+            return np.zeros(self.config.channels, dtype=np.float32)
+        return output
 
     def process(self, frames: int) -> np.ndarray:
         if frames <= 0:
@@ -444,7 +485,7 @@ class ClipSampler(BaseAudioModule):
             self._refresh_window()
 
         amplitude = float(self.get_parameter("amplitude") or 0.0)
-        amplitude *= self._velocity_gain * self._active_layer.amplitude_scale
+        amplitude *= self._velocity_gain * self._layer_mix_scale
         if amplitude <= 0.0:
             return np.zeros((frames, self.config.channels), dtype=np.float32)
 
@@ -456,7 +497,8 @@ class ClipSampler(BaseAudioModule):
         rate = base_rate * (2.0 ** (transpose / 12.0))
 
         if self._pending_retrigger:
-            self._position = float(self._clip_start)
+            for index, (start_frame, _) in self._layer_windows.items():
+                self._layer_positions[index] = float(start_frame)
             self._pending_retrigger = False
         # Reset retrigger parameter so a future automation event can fire again.
         super().set_parameter("retrigger", 0.0)
@@ -464,23 +506,66 @@ class ClipSampler(BaseAudioModule):
         output = np.zeros((frames, self.config.channels), dtype=np.float32)
         for idx in range(frames):
             frame = self._next_frame(rate)
-            if not frame.any() and not self._loop and self._position >= self._clip_end:
-                break
+            if not frame.any() and not self._loop:
+                if all(
+                    self._layer_positions.get(index, window[1]) >= window[1]
+                    for index, window in self._layer_windows.items()
+                ):
+                    break
             output[idx] = frame * amplitude
         return output
 
-    def _select_layer(self, velocity: int) -> ClipSampleLayer:
-        for layer in self._layers:
+    def _select_layer_index(self, velocity: int) -> int:
+        for index, layer in enumerate(self._layers):
             if layer.includes(velocity):
-                return layer
-        return self._layers[-1]
+                return index
+        return len(self._layers) - 1
 
     def _update_velocity_mapping(self) -> None:
         velocity = int(max(0, min(127, self._velocity)))
-        layer = self._select_layer(velocity)
-        if layer is not self._active_layer:
-            self._active_layer = layer
+        primary_index = self._select_layer_index(velocity)
+
+        crossfade_width = float(self.get_parameter("velocity_crossfade_width") or 0.0)
+        new_weights: dict[int, float]
+        if crossfade_width <= 0.0:
+            new_weights = {primary_index: 1.0}
+        else:
+            candidates: list[tuple[int, float]] = []
+            for index, layer in enumerate(self._layers):
+                min_velocity = layer.min_velocity
+                max_velocity = layer.max_velocity
+                if min_velocity <= velocity <= max_velocity:
+                    weight = 1.0
+                elif velocity < min_velocity:
+                    delta = min_velocity - velocity
+                    if delta > crossfade_width:
+                        weight = 0.0
+                    else:
+                        weight = max(0.0, 1.0 - (delta / crossfade_width))
+                else:
+                    delta = velocity - max_velocity
+                    if delta > crossfade_width:
+                        weight = 0.0
+                    else:
+                        weight = max(0.0, 1.0 - (delta / crossfade_width))
+                if weight > 0.0:
+                    candidates.append((index, weight))
+            if not candidates:
+                candidates = [(primary_index, 1.0)]
+            candidates.sort(key=lambda item: item[1], reverse=True)
+            candidates = candidates[:2]
+            total = sum(weight for _, weight in candidates)
+            if total <= 0.0:
+                new_weights = {primary_index: 1.0}
+            else:
+                new_weights = {index: weight / total for index, weight in candidates}
+
+        if set(new_weights.keys()) != set(self._layer_weights.keys()):
             self._window_dirty = True
+        self._layer_weights = new_weights
+        self._layer_mix_scale = sum(
+            self._layers[index].amplitude_scale * weight for index, weight in new_weights.items()
+        )
 
         min_gain = float(self.get_parameter("velocity_amplitude_min") or 0.0)
         max_gain = float(self.get_parameter("velocity_amplitude_max") or 0.0)
