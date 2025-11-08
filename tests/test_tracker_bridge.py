@@ -123,6 +123,12 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
     assert summaries[0]["rms_left_dbfs"] <= 0.0
     assert summaries[0]["integrated_lufs"] <= summaries[0]["rms_left_dbfs"] + 6.0
 
+    rows = bridge.tracker_loudness_rows(playback, beats_per_bucket=1.0)
+    assert len(rows) == len(summaries)
+    assert rows[0]["label"].startswith("Beats ")
+    assert "dBFS" in rows[0]["rms_text"]
+    assert rows[0]["dynamic_grade"] in {"bold", "balanced", "soft"}
+
 
 def test_automation_lane_range_and_percent_modes():
     sample_rate = 24_000
@@ -167,3 +173,55 @@ def test_automation_lane_range_and_percent_modes():
     assert amplitude_events[1]["value"] == pytest.approx(0.8)
     assert amplitude_events[0]["lane_metadata"]["mode"] == "percent"
     assert amplitude_events[0]["lane_metadata"]["range"] == (0.2, 0.8)
+
+
+def test_automation_lane_curves_shape_values():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=96.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Simple Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.2, "frequency_hz": 440.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_curves",
+        name="Automation Curves",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|curve=exponential": [
+                AutomationPoint(position_beats=0.0, value=0.5),
+            ],
+            "osc.frequency_hz|normalized|curve=log": [
+                AutomationPoint(position_beats=0.0, value=0.25),
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    amp_event = next(
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc" and event["parameter"] == "amplitude"
+    )
+    freq_event = next(
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc" and event["parameter"] == "frequency_hz"
+    )
+
+    assert amp_event["lane_metadata"]["curve"] == "exponential"
+    assert amp_event["value"] == pytest.approx(0.25)
+    assert freq_event["lane_metadata"]["curve"] == "log"
+    # sqrt(0.25) = 0.5 ➜ halfway between min/max frequency (20 Hz ➜ 20_000 Hz)
+    assert freq_event["value"] == pytest.approx(10_010.0, rel=1e-4)

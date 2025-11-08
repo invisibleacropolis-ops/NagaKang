@@ -196,6 +196,51 @@ def test_sampler_velocity_layers_select_buffers():
     assert loud_right > loud_left * 3.0
 
 
+def test_sampler_velocity_crossfade_blends_layers():
+    config = EngineConfig(sample_rate=12_000, block_size=64, channels=2)
+    engine = OfflineAudioEngine(config)
+
+    frames = config.sample_rate // 2
+    left = np.zeros((frames, 2), dtype=np.float32)
+    left[:, 0] = 1.0
+    right = np.zeros((frames, 2), dtype=np.float32)
+    right[:, 1] = 1.0
+
+    sampler = ClipSampler(
+        "clip",
+        config,
+        layers=[
+            ClipSampleLayer(sample=left, max_velocity=80, amplitude_scale=1.0),
+            ClipSampleLayer(sample=right, min_velocity=81, amplitude_scale=1.0),
+        ],
+        amplitude=0.8,
+        length_percent=0.6,
+    )
+    sampler.set_parameter("velocity_amplitude_min", 1.0)
+    sampler.set_parameter("velocity_amplitude_max", 1.0)
+    sampler.set_parameter("velocity_crossfade_width", 8.0)
+    engine.add_module(sampler, as_output=True)
+
+    engine.schedule_parameter_change("clip", "velocity", beats=0.0, value=75.0)
+    engine.schedule_parameter_change("clip", "retrigger", beats=0.0, value=1.0)
+    engine.schedule_parameter_change("clip", "velocity", beats=1.0, value=84.0)
+    engine.schedule_parameter_change("clip", "retrigger", beats=1.0, value=1.0)
+
+    audio = engine.render(2.0)
+    frames_per_beat = int(round(engine.tempo.beats_to_seconds(1.0) * config.sample_rate))
+    soft = audio[:frames_per_beat]
+    blended = audio[frames_per_beat : frames_per_beat * 2]
+
+    soft_left = float(np.mean(np.abs(soft[:, 0])))
+    soft_right = float(np.mean(np.abs(soft[:, 1])))
+    blend_left = float(np.mean(np.abs(blended[:, 0])))
+    blend_right = float(np.mean(np.abs(blended[:, 1])))
+
+    assert soft_left > soft_right * 3.0
+    assert blend_right > blend_left
+    assert blend_left > soft_left * 0.1  # crossfade preserved some left channel energy
+
+
 def test_render_metrics_report_musician_friendly_numbers():
     config = EngineConfig(sample_rate=48_000, block_size=128, channels=2)
     engine = OfflineAudioEngine(config)

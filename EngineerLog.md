@@ -1,5 +1,45 @@
 # Engineer Log
 
+# Session Summary (Step 3 Crossfade Sampler & Tracker Dashboard – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) to anchor the
+  sampler crossfade and tracker dashboard work in the musician-first goals
+  before modifying code.
+- Extended `audio.modules.ClipSampler` with `velocity_crossfade_width`, per-layer
+  playback windows, and weighted mixing so legato keyboard lines glide between
+  sample layers without jarring tonal jumps. Added regression coverage for the
+  new crossfade behaviour. (Sampler expressiveness completion: ~82% ➜ ~88%)
+- Upgraded `PatternPerformanceBridge` with tracker-facing loudness rows and
+  automation curve metadata (exponential/log/s-curve) so rehearsal notebooks can
+  surface musician-friendly labels while preserving normalized editing. Expanded
+  tracker bridge tests to audit the new curve maths and dashboard payloads.
+  (Pattern bridge automation completion: ~74% ➜ ~82%)
+- Authored `docs/release/windows_installer_plan.md` to outline the MSI-focused
+  packaging roadmap (PyInstaller + WiX), ensuring the Step 3 release can ship as
+  a one-click Windows install for non-technical musicians. (Windows installer
+  planning completion: 0% ➜ ~25%)
+- Updated Step 3 documentation to explain velocity crossfades, tracker dashboard
+  helpers, and curve metadata so external engineers can reproduce the new
+  workflows. (Documentation for sampler & bridge completion: ~75% ➜ ~85%)
+- Ran `poetry run pytest` to validate audio module, tracker bridge, and existing
+  regression suites after the crossfade and automation updates.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~88% ➜ 92%)**
+   - Capture listening notes for multi-layer crossfades (strings/pads), add
+     decay-tail blending tests, and document recommended velocity ranges for
+     performers.
+2. **Beat Loudness Visualization in Tracker UI (~70% ➜ 78%)**
+   - Integrate `tracker_loudness_rows` into the tracker notebook widget, capture
+     annotated screenshots, and gather musician feedback on the dynamic grading
+     scheme.
+3. **Pattern Bridge Automation Refinements (~82% ➜ 88%)**
+   - Support user-defined curve intensity (e.g., `curve=exponential:1.5`), add
+     smoothing across simultaneous parameter lanes, and document troubleshooting
+     tips for automation scaling.
+4. **Windows Installer Enablement (~25% ➜ 50%)**
+   - Prototype the PyInstaller bundler script, draft the WiX manifest skeleton,
+     and test installation on a clean Windows VM.
+
 # Session Summary (Step 3 Velocity-Responsive Sampler – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) to anchor the
   sampler velocity goals in the broader musician-first roadmap before editing

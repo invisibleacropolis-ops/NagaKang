@@ -11,12 +11,17 @@ pattern grid.
 - **Clip sampler defaults:** `audio.modules.ClipSampler` exposes start/length
   gestures, velocity-sensitive gain/start offsets, multi-layer sample selection,
   retriggers, and semitone transposition so vocal chops or drum hits can be
-  staged quickly.
+  staged quickly. The sampler now blends adjacent layers with
+  `velocity_crossfade_width` so legato passages feel natural when sliding across
+  dynamic layers.
 - **Pattern-aware scheduling:** `audio.tracker_bridge.PatternPerformanceBridge`
   reads `domain.models.Pattern` data, converts step events into beat-aligned
   automation, and reuses the offline engine to produce renders.
 - **Per-beat loudness summaries:** The bridge packages beat buckets with RMS and
   LUFS metrics, letting notebook dashboards surface dynamics trends at a glance.
+- **Tracker dashboard helpers:** `PatternPerformanceBridge.tracker_loudness_rows`
+  formats the loudness table into label/text pairs (plus a dynamic grade) ready
+  for tracker widgets or rehearsal notebook dashboards.
 - **Prototype CLI:** `python prototypes/audio_engine_skeleton.py --pattern-demo`
   prints the loudness table and automation counts so QA can sanity-check new
   patterns before shipping stems.
@@ -63,18 +68,19 @@ instrument = InstrumentDefinition(
     id="vox",
     name="Vocal Chop",
     modules=[
-        InstrumentModule(
-            id="sampler",
-            type="clip_sampler:vox",
-            parameters={
-                "start_percent": 0.2,
-                "length_percent": 0.5,
-                "velocity_start_offset_percent": 0.25,
-                "layers": [
-                    {"sample_name": "vox_soft", "max_velocity": 80, "amplitude_scale": 0.75},
-                    {"sample_name": "vox_hard", "min_velocity": 81, "amplitude_scale": 1.1},
-                ],
-            },
+            InstrumentModule(
+                id="sampler",
+                type="clip_sampler:vox",
+                parameters={
+                    "start_percent": 0.2,
+                    "length_percent": 0.5,
+                    "velocity_start_offset_percent": 0.25,
+                    "velocity_crossfade_width": 10.0,
+                    "layers": [
+                        {"sample_name": "vox_soft", "max_velocity": 80, "amplitude_scale": 0.75},
+                        {"sample_name": "vox_hard", "min_velocity": 81, "amplitude_scale": 1.1},
+                    ],
+                },
         ),
         InstrumentModule(id="env", type="amplitude_envelope", inputs=["sampler"], parameters={"attack_ms": 12.0}),
         InstrumentModule(id="lp", type="one_pole_low_pass", inputs=["env"], parameters={"cutoff_hz": 3_000.0}),
@@ -97,6 +103,7 @@ pattern = Pattern(
 bridge = PatternPerformanceBridge(config, tempo, sample_library=library)
 playback = bridge.render_pattern(pattern, instrument)
 loudness = bridge.loudness_trends(playback)
+dashboard_rows = bridge.tracker_loudness_rows(playback)
 ```
 
 Feed the returned `loudness` table into a notebook plot or tracker UI to show
@@ -119,6 +126,10 @@ real parameter ranges:
   absolute numbers straight into the engine.
 - Append `|range=min:max` to clamp the mapped range for that lane (e.g.
   `filter.cutoff_hz|normalized|range=200:8000`).
+- Append `|curve=exponential` (or `log`, `s_curve`) to reshape the normalized
+  lane values before scaling. `exponential` eases in softly, `log` eases out,
+  and `s_curve` provides a smooth midpoint-focused transition useful for
+  swell-style fades.
 
 The automation log records both the normalized `source_value` and the resolved
 `value`, along with the parsed `lane_metadata`, so rehearsal leads can audit how
