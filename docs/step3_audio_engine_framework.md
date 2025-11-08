@@ -113,6 +113,24 @@ Use the `velocity` parameter to match incoming MIDI data, tweak
 of the clip. The optional `ClipSampleLayer` list picks the right buffer for each
 velocity range, so a single module can cover soft-to-hard articulations.
 
+### Velocity crossfade listening notes
+
+- **Strings & pads** – map soft articulations to MIDI `1–64`, body layers to
+  `65–104`, and bold swells to `105–127`. Set
+  `velocity_crossfade_width=12` to keep legato tails breathing without audible
+  layer seams. The new regression test
+  (`tests/test_audio_modules.py::test_sampler_velocity_crossfade_preserves_decay_tails`)
+  confirms the mid-layer tail stays present even when hammering the bold layer.
+- **Keys (EP/organ)** – target `velocity_crossfade_width=8` so fast riffs stay
+  articulate. Use the mid layer for `55–100` and bold layer above `101` to align
+  with typical drawbar and pickup responses.
+- **Plucked textures** – favour a narrower `velocity_crossfade_width=6` and
+  reserve the boldest layer for `97+` so rhythm sections can comp quietly while
+  still accessing aggressive strums.
+
+Capture subjective listening notes during rehearsals and drop them into the
+EngineerLog so upcoming patches can fine-tune the weighting heuristics.
+
 ## Prototype Bridge (Step 3 Focus)
 
 `prototypes/audio_engine_skeleton.py` now exposes the existing

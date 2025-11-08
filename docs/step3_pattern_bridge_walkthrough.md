@@ -22,6 +22,9 @@ pattern grid.
 - **Tracker dashboard helpers:** `PatternPerformanceBridge.tracker_loudness_rows`
   formats the loudness table into label/text pairs (plus a dynamic grade) ready
   for tracker widgets or rehearsal notebook dashboards.
+- **Notebook widget integration:** `docs/step3_tracker_notebook_widget.py`
+  renders those rows with colour-coded dynamics badges, giving rehearsal leads a
+  drop-in component for Jupyter notebooks.
 - **Prototype CLI:** `python prototypes/audio_engine_skeleton.py --pattern-demo`
   prints the loudness table and automation counts so QA can sanity-check new
   patterns before shipping stems.
@@ -129,7 +132,12 @@ real parameter ranges:
 - Append `|curve=exponential` (or `log`, `s_curve`) to reshape the normalized
   lane values before scaling. `exponential` eases in softly, `log` eases out,
   and `s_curve` provides a smooth midpoint-focused transition useful for
-  swell-style fades.
+  swell-style fades. Add an optional intensity (e.g. `curve=exponential:3.0`) to
+  tighten or relax the curvature without rewriting lane data.
+- When multiple lanes collide on the same module parameter and beat, the bridge
+  averages their resolved values and logs `smoothing_sources` so notebook UIs
+  can show which lanes contributed to a combined move. This prevents double-
+  loudness jumps while keeping the audit trail intact.
 
 The automation log records both the normalized `source_value` and the resolved
 `value`, along with the parsed `lane_metadata`, so rehearsal leads can audit how
@@ -142,4 +150,6 @@ their tracker gestures were translated into engine parameters.
 - Extend the bridge with beat-aligned mixer automation so rehearsal directors
   can preview send effects without exporting stems.
 - Capture screenshots of the loudness dashboard once the tracker UI consumes
-  `beat_loudness` to close the musician feedback loop.
+  `beat_loudness` to close the musician feedback loop. The interim notebook
+  widget in `docs/step3_tracker_notebook_widget.py` is ready for screenshotting
+  during rehearsals.

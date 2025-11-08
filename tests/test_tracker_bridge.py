@@ -225,3 +225,117 @@ def test_automation_lane_curves_shape_values():
     assert freq_event["lane_metadata"]["curve"] == "log"
     # sqrt(0.25) = 0.5 ➜ halfway between min/max frequency (20 Hz ➜ 20_000 Hz)
     assert freq_event["value"] == pytest.approx(10_010.0, rel=1e-4)
+
+
+def test_automation_curve_intensity_adjusts_mapping():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=110.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Dynamic Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.2, "frequency_hz": 440.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="curve_intensity",
+        name="Curve Intensity",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|curve=exponential:3.0": [
+                AutomationPoint(position_beats=0.0, value=0.5)
+            ],
+            "osc.frequency_hz|normalized|curve=log:4.0": [
+                AutomationPoint(position_beats=0.0, value=0.25)
+            ],
+            "osc.amplitude|normalized|curve=s_curve:0.5": [
+                AutomationPoint(position_beats=1.0, value=0.75)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    amp_events = [
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc" and event["parameter"] == "amplitude"
+    ]
+    freq_event = next(
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc" and event["parameter"] == "frequency_hz"
+    )
+
+    first_amp = next(event for event in amp_events if event["beats"] == pytest.approx(0.0))
+    second_amp = next(event for event in amp_events if event["beats"] == pytest.approx(1.0))
+
+    assert first_amp["lane_metadata"]["curve"] == "exponential"
+    assert first_amp["lane_metadata"]["curve_intensity"] == pytest.approx(3.0)
+    assert first_amp["value"] == pytest.approx(0.5**3, rel=1e-5)
+
+    expected_freq = 20.0 + (20_000.0 - 20.0) * (0.25 ** (1.0 / 4.0))
+    assert freq_event["lane_metadata"]["curve_intensity"] == pytest.approx(4.0)
+    assert freq_event["value"] == pytest.approx(expected_freq, rel=1e-5)
+
+    assert isinstance(second_amp["lane_metadata"], dict)
+    assert second_amp["lane_metadata"]["curve"] == "s_curve"
+    assert second_amp["lane_metadata"]["curve_intensity"] == pytest.approx(0.5)
+    assert second_amp["value"] == pytest.approx(0.7, rel=0.1)
+
+
+def test_automation_lane_smoothing_averages_collisions():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=100.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Simple Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.2, "frequency_hz": 220.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_smoothing",
+        name="Automation Smoothing",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized": [AutomationPoint(position_beats=0.0, value=0.2)],
+            "osc.amplitude|percent|range=0.0:1.0": [
+                AutomationPoint(position_beats=0.0, value=80.0)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    amp_event = next(
+        event
+        for event in playback.automation_log
+        if event["module"] == "osc"
+        and event["parameter"] == "amplitude"
+        and event["beats"] == pytest.approx(0.0)
+    )
+
+    assert amp_event["value"] == pytest.approx((0.2 + 0.8) / 2.0)
+    assert isinstance(amp_event["lane_metadata"], list)
+    assert {meta["mode"] for meta in amp_event["lane_metadata"]} == {"normalized", "percent"}
+    assert amp_event["smoothing_mode"] == "average"
+    assert amp_event["smoothed_values"] == pytest.approx([0.2, 0.8])
+    assert sorted(amp_event["smoothing_sources"]) == sorted(pattern.automation.keys())
+    assert amp_event["source_value"] == [0.2, 80.0]
