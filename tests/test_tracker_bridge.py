@@ -183,6 +183,9 @@ def test_sampler_crossfade_defaults_apply_per_family(family, expected):
 
     params = playback.module_parameters["sampler"]
     assert params["velocity_crossfade_width"] == pytest.approx(expected)
+    if family == "vocal":
+        assert params["velocity_amplitude_min"] == pytest.approx(0.48, rel=1e-3)
+        assert params["velocity_amplitude_max"] == pytest.approx(1.05, rel=1e-3)
 
 
 def test_sampler_crossfade_respects_manual_override():
@@ -220,6 +223,68 @@ def test_sampler_crossfade_respects_manual_override():
     playback = bridge.render_pattern(pattern, instrument)
     params = playback.module_parameters["sampler"]
     assert params["velocity_crossfade_width"] == pytest.approx(4.5)
+
+
+def test_vocal_sampler_applies_velocity_amplitude_defaults_for_stabs():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=120.0)
+
+    duration_seconds = 0.3
+    frames = int(duration_seconds * sample_rate)
+    base = np.ones((frames, 2), dtype=np.float32)
+    library = {"vox_soft": base * 0.5, "vox_bold": base}
+
+    instrument = InstrumentDefinition(
+        id="vox_short",
+        name="Gospel Stab",
+        modules=[
+            InstrumentModule(
+                id="sampler",
+                type="clip_sampler:vox_soft",
+                parameters={
+                    "instrument_family": "vocal",
+                    "length_percent": 0.35,
+                    "layers": [
+                        {"sample_name": "vox_soft", "max_velocity": 80},
+                        {"sample_name": "vox_bold", "min_velocity": 81},
+                    ],
+                },
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="stab_pattern",
+        name="Stab Pattern",
+        length_steps=8,
+        steps=[
+            PatternStep(note=60, velocity=48, instrument_id=instrument.id),
+            PatternStep(),
+            PatternStep(note=60, velocity=118, instrument_id=instrument.id),
+            *[PatternStep() for _ in range(5)],
+        ],
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, sample_library=library)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    params = playback.module_parameters["sampler"]
+    assert params["velocity_amplitude_min"] == pytest.approx(0.48, rel=1e-3)
+    assert params["velocity_amplitude_max"] == pytest.approx(1.05, rel=1e-3)
+
+    assert np.any(playback.buffer)
+    frames_per_beat = int(round(sample_rate * tempo.beats_to_seconds(1.0)))
+    first_hit = playback.buffer[:frames_per_beat]
+    assert float(np.max(np.abs(first_hit[:, 0]))) > 0.0
+
+    velocity_events = [
+        event
+        for event in playback.automation_log
+        if event.get("module") == "sampler" and event.get("parameter") == "velocity"
+    ]
+    assert {event["beats"] for event in velocity_events} == {0.0, 0.5}
+    assert all(event.get("event_id") for event in velocity_events)
 
 
 def test_automation_lane_range_and_percent_modes():
@@ -569,6 +634,9 @@ def test_automation_dashboard_rows_surface_metadata():
     assert rows, "Expected smoothing rows to be generated"
     row = rows[0]
     assert row["label"] == "osc.amplitude"
+    assert row["identifier"].startswith("osc.amplitude@")
+    assert row["event_id"] == row["identifier"]
+    assert isinstance(row["event_index"], int)
     assert row["applied"] is True
     assert row["segments"] == 4
     assert row["strategy"] == "linear_ramp"

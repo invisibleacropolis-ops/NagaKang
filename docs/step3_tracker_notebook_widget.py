@@ -95,12 +95,15 @@ def show_loudness_widget(rows: Iterable[Mapping[str, object]]) -> None:
 
 def _format_smoothing_row_text(row: Mapping[str, object]) -> str:
     beat = row.get("beat", 0.0)
-    label = row.get("label", "")
+    identifier = row.get("identifier") or row.get("event_id")
+    label = identifier or row.get("label", "")
     strategy = row.get("strategy", "none")
     segments = row.get("segments", 0)
     state = "applied" if row.get("applied") else "pending"
+    event_index = row.get("event_index")
+    index_suffix = f" · #{event_index}" if event_index is not None else ""
     return (
-        f"{label} @ {beat:.2f} beats → {strategy} ({segments} segments, {state})"
+        f"{label} @ {beat:.2f} beats → {strategy} ({segments} segments, {state}{index_suffix})"
     )
 
 
@@ -127,8 +130,9 @@ def build_automation_smoothing_widget(rows: Iterable[Mapping[str, object]]):
     for row in rows:
         state = "applied" if row.get("applied") else "pending"
         color = SMOOTHING_COLORS.get(state, "#424242")
+        label_token = str(row.get("identifier", row.get("label", "")))
         label = widgets.HTML(
-            value=f"<span style='font-weight:600'>{row['label']}</span>",
+            value=f"<span style='font-weight:600'>{label_token}</span>",
             layout=widgets.Layout(width="160px"),
         )
         details = widgets.HTML(

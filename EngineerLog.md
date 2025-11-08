@@ -1,5 +1,52 @@
 # Engineer Log
 
+# Session Summary (Step 3 Vocal Stabs & Step 4 Undo Scaffolding – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–4 & §9) to align the
+  vocal stab heuristics, automation dashboard identifiers, and Step 4 editor
+  scaffolding with the roadmap before modifying code or docs.
+- Captured the gospel choir stab renders and baked the findings into
+  `PatternPerformanceBridge`: vocal samplers now inherit
+  `velocity_amplitude_min=0.48` / `velocity_amplitude_max=1.05` alongside the
+  10-step crossfade. Regression coverage verifies the defaults and audio log
+  identifiers for short-release layers. (Sampler expressiveness completion:
+  ~96% ➜ ~98%)
+- Added persistent automation event IDs and segment counts to
+  `automation_smoothing_rows`, refreshed the notebook widget to show the new
+  identifiers, and upgraded the CLI demo to print smoothing summaries. Updated
+  docs capture the identifier workflow for undo mapping. (Pattern bridge
+  automation completion: ~94% ➜ ~96%)
+- Extended `tracker.PatternEditor` with mutation IDs, undo/redo stacks, and the
+  new `PlaybackQueue` stub so Step 4 can queue preview renders while keeping the
+  tracker responsive. Documented the flow in
+  `docs/step4_sequencer_foundations.md`. (Step 4 sequencer foundations
+  completion: ~10% ➜ ~18%)
+- Logged the gospel stab findings and widget identifier guidance in the QA and
+  tracker documentation so external engineers can trace presets back to render
+  evidence. (Documentation for sampler & bridge completion: ~96% ➜ ~98%)
+- Ran `poetry run pytest` across the suite to exercise the new sampler
+  heuristics, smoothing identifiers, undo/redo scaffolding, and CLI updates.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~98% ➜ 99%)**
+   - Mirror the gospel stab renders to the secure S3 bucket, capture LUFS notes
+     for longer-release choir swells, and confirm the vocal heuristics still hold
+     when pads and stabs layer together.
+2. **Pattern Bridge Automation Refinements (~96% ➜ 97%)**
+   - Thread the automation event identifiers into the tracker CLI export JSON,
+     add optional segment totals to the dashboard rows, and validate smoothing
+     summaries against multi-lane collisions.
+3. **Beat Loudness Visualisation in Tracker UI (~87% ➜ 89%)**
+   - Refresh the Kivy mock with the updated smoothing identifiers, capture a
+     paired screenshot for the rehearsal doc set, and align badge copy with the
+     new CLI smoothing terminology.
+4. **Windows Installer Enablement (~62% ➜ 62%)**
+   - Draft the GitHub Actions dry-run workflow that exercises the PyInstaller
+     bundle, outlining artifact review checkpoints for QA sign-off.
+5. **Step 4 Sequencer Foundations (~18% ➜ 25%)**
+   - Implement mutation batching in `PatternEditor`, design the tempo-aware
+     step-to-beat helpers feeding `PlaybackQueue`, and sketch the tracker-grid
+     gesture flows in the Step 4 design notebook.
+
 # Session Summary (Step 3 Wrap & Step 4 Sequencer Kickoff – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–4 & §9) to anchor the
   final Step 3 polish and ensure the Step 4 sequencer kickoff aligned with the

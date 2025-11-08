@@ -19,6 +19,11 @@ pattern grid.
   bridge applies the listening-tested default (`12`, `8`, `6`, or `10` MIDI
   steps) for `velocity_crossfade_width`. Musicians still override manually, but
   the baseline now matches the curated velocity notes in the sampler guide.
+- **Vocal amplitude heuristics:** Gospel stab renders raised the vocal defaults
+  to `velocity_amplitude_min=0.48` / `velocity_amplitude_max=1.05` so short
+  release clips stay audible without flattening bold hits. The bridge applies
+  those values automatically when `instrument_family="vocal"` and leaves manual
+  overrides intact for edge cases.
 - **Pattern-aware scheduling:** `audio.tracker_bridge.PatternPerformanceBridge`
   reads `domain.models.Pattern` data, converts step events into beat-aligned
   automation, and reuses the offline engine to produce renders.
@@ -50,10 +55,15 @@ pattern grid.
    [INFO] Pattern beats 1.0–2.0: RMS L/R -26.5/-26.4 dBFS, -28.3 LUFS
    [INFO] Pattern beats 2.0–3.0: RMS L/R -11.8/-11.7 dBFS, -11.2 LUFS
    [INFO] Pattern demo automation events: 8
+   [INFO] Smoothing filter.cutoff_hz@0.0000#11: 5 segments over 0.01 beats (pending)
+   [INFO] Smoothing filter.cutoff_hz@2.0000#12: 5 segments over 0.01 beats (applied)
+   [INFO] Smoothing summary: 2 events, 10 segments
    ```
 
    Use the RMS/LUFS swings to decide whether the second hit needs extra layering
-   or whether the envelope release should stretch.
+   or whether the envelope release should stretch. The smoothing lines highlight
+   how many intermediate points were inserted on the filter lane so Step 4
+   undo/redo tooling can reconcile notebook dashboards with tracker playback.
 
 ## Layering Your Own Pattern
 

@@ -106,6 +106,10 @@ show_tracker_dashboard(rows, smoothing)
 - Both panels now share container spacing and border tokens, so dropping them
   into the Step 4 tracker UI mock is as simple as stacking the corresponding
   `VBox` widgets in a single column.
+- Each smoothing row now exposes an `identifier` (`module.parameter@beat#n`) and
+  zero-based `event_index`. The notebook widget shows that token directly so
+  facilitators can map dashboard entries to the undo/redo stack landing in
+  `tracker.PatternEditor`.
 
 The mock guide also includes an ASCII layout that mirrors the widget's spacing
 and margin tokens so the tracker UI team can wireframe the dashboard before the
