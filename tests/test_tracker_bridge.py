@@ -7,7 +7,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
 
-from audio.engine import EngineConfig, TempoMap
+from audio.engine import EngineConfig, OfflineAudioEngine, TempoMap
 from audio.tracker_bridge import PatternPerformanceBridge
 from domain.models import AutomationPoint, InstrumentDefinition, InstrumentModule, Pattern, PatternStep
 
@@ -128,6 +128,97 @@ def test_pattern_bridge_renders_sampler_chain_and_logs_automation():
     assert rows[0]["label"].startswith("Beats ")
     assert "dBFS" in rows[0]["rms_text"]
     assert rows[0]["dynamic_grade"] in {"bold", "balanced", "soft"}
+
+
+@pytest.mark.parametrize(
+    "family,expected",
+    [
+        ("strings", 12.0),
+        ("pads", 12.0),
+        ("keys", 8.0),
+        ("plucked", 6.0),
+    ],
+)
+def test_sampler_crossfade_defaults_apply_per_family(family, expected):
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=110.0)
+    soft = _make_sample(1.0, sample_rate)
+    hard = soft * 1.1
+    library = {"soft": soft, "hard": hard}
+
+    instrument = InstrumentDefinition(
+        id=f"vox_{family}",
+        name="Velocity Layers",
+        modules=[
+            InstrumentModule(
+                id="sampler",
+                type="clip_sampler:soft",
+                parameters={
+                    "instrument_family": family,
+                    "layers": [
+                        {"sample_name": "soft", "max_velocity": 90},
+                        {"sample_name": "hard", "min_velocity": 91},
+                    ],
+                },
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id=f"pattern_{family}",
+        name="Pattern",
+        length_steps=4,
+        steps=[
+            PatternStep(note=60, velocity=64, instrument_id=instrument.id),
+            PatternStep(note=67, velocity=118, instrument_id=instrument.id),
+            PatternStep(),
+            PatternStep(),
+        ],
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, sample_library=library)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    params = playback.module_parameters["sampler"]
+    assert params["velocity_crossfade_width"] == pytest.approx(expected)
+
+
+def test_sampler_crossfade_respects_manual_override():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=90.0)
+    library = {"soft": _make_sample(1.0, sample_rate)}
+
+    instrument = InstrumentDefinition(
+        id="vox_override",
+        name="Velocity Override",
+        modules=[
+            InstrumentModule(
+                id="sampler",
+                type="clip_sampler:soft",
+                parameters={
+                    "instrument_family": "strings",
+                    "velocity_crossfade_width": 4.5,
+                    "layers": [
+                        {"sample_name": "soft", "max_velocity": 100},
+                    ],
+                },
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="pattern_override",
+        name="Pattern Override",
+        length_steps=4,
+        steps=[PatternStep(note=60, velocity=100, instrument_id=instrument.id)],
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, sample_library=library)
+    playback = bridge.render_pattern(pattern, instrument)
+    params = playback.module_parameters["sampler"]
+    assert params["velocity_crossfade_width"] == pytest.approx(4.5)
 
 
 def test_automation_lane_range_and_percent_modes():
@@ -339,3 +430,60 @@ def test_automation_lane_smoothing_averages_collisions():
     assert amp_event["smoothed_values"] == pytest.approx([0.2, 0.8])
     assert sorted(amp_event["smoothing_sources"]) == sorted(pattern.automation.keys())
     assert amp_event["source_value"] == [0.2, 80.0]
+    assert "smoothing" not in amp_event
+
+
+def test_automation_lane_smoothing_creates_linear_ramp():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=120, channels=2)
+    tempo = TempoMap(tempo_bpm=120.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Smooth Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.2, "frequency_hz": 330.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_smoothing_window",
+        name="Automation Smoothing Window",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|smooth=5ms": [
+                AutomationPoint(position_beats=1.0, value=0.6)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    engine = OfflineAudioEngine(config, tempo=tempo)
+    modules = bridge._instantiate_instrument(engine, instrument)
+    automation_log: list[dict[str, object]] = []
+    bridge._schedule_automation_lanes(engine, pattern, modules, automation_log)
+
+    events = sorted(engine.timeline._events, key=lambda evt: evt.time_seconds)
+    assert len(events) >= 3
+
+    seconds_per_beat = tempo.beats_to_seconds(1.0)
+    start_time = seconds_per_beat * (1.0 - 0.01)
+    assert events[0].time_seconds == pytest.approx(start_time, rel=1e-3)
+    assert events[-1].time_seconds == pytest.approx(seconds_per_beat * 1.0, rel=1e-3)
+
+    values = [event.value for event in events]
+    assert values[0] == pytest.approx(0.2)
+    assert values[-1] == pytest.approx(0.6)
+    assert any(abs(v - 0.4) <= 0.08 for v in values[1:-1])
+
+    assert len(automation_log) == 1
+    smoothing = automation_log[0]["smoothing"]
+    assert smoothing["applied"] is True
+    assert smoothing["strategy"] == "linear_ramp"
+    assert smoothing["previous_value"] == pytest.approx(0.2)
+    assert smoothing["window_seconds"] == pytest.approx(0.005, rel=0.2)
+    assert smoothing["segments"] >= 3

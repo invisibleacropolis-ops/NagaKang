@@ -39,10 +39,32 @@ without development tooling.
       our `poetry` environment and exports a `dist/nagakang` folder.
 - [x] Scaffold a WiX `.wxs` template under `tools/packaging/windows/` with
       placeholders for version, product codes, and install directories.
-- [ ] Document environment prerequisites (`choco install wix`, `pip install
+- [x] Document environment prerequisites (`choco install wix`, `pip install
       pyinstaller`) in `docs/release/windows_installer_plan.md` once scripts land.
 - [ ] Extend GitHub Actions with a Windows job that runs the bundler in dry-run
       mode to ensure cross-platform determinism before enabling signing.
+
+## Environment prerequisites
+
+On a clean Windows 10/11 rehearsal machine or VM:
+
+1. Install WiX Toolset 4 via Chocolatey:
+
+   ```powershell
+   choco install wix --version=4.0.1
+   ```
+
+2. Install Python build dependencies inside the Poetry shell:
+
+   ```powershell
+   poetry run pip install pyinstaller==5.13.2
+   ```
+
+3. (Optional) Install `signtool` via the Windows SDK if code signing is part of
+   the rehearsal.
+
+Confirm `pyinstaller --version` and `wix --version` both succeed before running
+the bundler.
 
 ## Testing & QA Notes
 
@@ -65,6 +87,12 @@ without development tooling.
   PyInstaller command before producing artefacts. Remove `--dry-run` for actual
   bundles. Use `--extra-data path/to/samples=samples` to include curated demo
   libraries for rehearsal leads.
+- When running on Windows, point `--dist-dir` at a short path (e.g.
+  `C:\nagakang\dist`) to avoid the MAX_PATH issues PyInstaller still hits on
+  long project directories.
+- Verify the bundle launches by double-clicking `NagaKang.exe` inside `dist/`
+  after installation, then capture screenshots of each WiX panel for the Step 4
+  onboarding pack.
 - After bundling, feed `dist/nagakang` into `tools/packaging/windows/
   nagakang_product_template.wxs` by harvesting files with WiX `heat.exe` and
   compiling via `candle`/`light` once Windows build hosts are available.

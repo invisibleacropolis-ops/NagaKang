@@ -1,5 +1,47 @@
 # Engineer Log
 
+# Session Summary (Step 3 Family Defaults & Automation Smoothing – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §3 & §9) before coding so
+  the sampler defaults and automation smoothing stayed rooted in musician-first
+  milestones.
+- Extended `PatternPerformanceBridge` to detect `instrument_family` metadata and
+  auto-apply the curated `velocity_crossfade_width` defaults (strings/pads=12,
+  keys=8, plucked=6). Added regression coverage proving each family receives the
+  expected width while respecting manual overrides. (Sampler expressiveness
+  completion: ~91% ➜ ~94%)
+- Implemented per-lane smoothing windows (`|smooth=5ms`) that fan out linear
+  ramps when automation lanes collide, logging the applied window/segments for
+  troubleshooting. Added dedicated tests that inspect the scheduled ramp events
+  and smoothing metadata. (Pattern bridge automation completion: ~86% ➜ ~90%)
+- Captured sampler listening notes in
+  `docs/qa/audio_velocity_crossfade_listening.md`, refreshed
+  `docs/step3_audio_engine_framework.md`, and updated the pattern bridge
+  walkthrough so external engineers inherit the new defaults and smoothing
+  tokens. (Documentation for sampler & bridge completion: ~85% ➜ ~90%)
+- Embedded the loudness badge palette into the tracker UI mock guidance and
+  logged rehearsal quotes in `docs/step3_tracker_notebook_widget.md` to align the
+  notebook widget with upcoming Kivy layouts. (Beat loudness visualisation
+  completion: ~76% ➜ ~82%)
+- Documented PyInstaller/WiX prerequisites and Windows-specific bundler tips in
+  `docs/release/windows_installer_plan.md` to unblock rehearsal machines. (Windows
+  installer enablement completion: ~40% ➜ ~55%)
+- Ran `poetry run pytest` to cover the new tracker bridge scenarios, sampler
+  defaults, and existing suites before wrapping the session.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~94% ➜ 96%)**
+   - Bounce choir pad comparisons, archive WAV references in `docs/assets/audio/`,
+     and reassess whether strings defaults cover the vocal set.
+2. **Beat Loudness Visualisation in Tracker UI (~82% ➜ 88%)**
+   - Wire the palette into the Kivy tracker mock, capture annotated screenshots,
+     and verify the badge layout on Windows HiDPI displays.
+3. **Pattern Bridge Automation Refinements (~90% ➜ 94%)**
+   - Surface smoothing metadata in the notebook dashboard, expose a configurable
+     ramp segment count, and document rollback steps for aggressive fades.
+4. **Windows Installer Enablement (~55% ➜ 65%)**
+   - Execute the bundler on a Windows VM, capture WiX wizard screenshots, and
+     draft a CI plan for the dry-run PyInstaller job.
+
 # Session Summary (Step 3 Crossfade Sampler & Tracker Dashboard – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §3 & §9) to anchor the
   sampler crossfade and tracker dashboard work in the musician-first goals
