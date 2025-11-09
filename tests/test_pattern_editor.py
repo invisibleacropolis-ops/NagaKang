@@ -178,6 +178,18 @@ def test_step_to_beat_and_preview_window_respect_resolution():
     assert request.duration_beats == pytest.approx(1.25)
 
 
+def test_beat_conversions_round_trip_and_cover_windows():
+    pattern = _make_pattern(16)
+    editor = PatternEditor(pattern, steps_per_beat=6.0)
+
+    assert editor.beats_to_steps(1.5) == pytest.approx(9.0)
+    assert editor.beat_to_step(0.5) == 3
+
+    start_step, end_step = editor.beat_window_to_step_range(0.5, 1.25)
+    assert start_step == 3
+    # 0.5 + 1.25 = 1.75 beats -> 10.5 steps -> ceil -> 11 -> minus 1 = 10
+    assert end_step == 10
+
 def _make_pattern(length: int = 8) -> Pattern:
     return Pattern(
         id="pattern",

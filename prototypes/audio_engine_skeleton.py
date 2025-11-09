@@ -53,6 +53,7 @@ from audio.metrics import integrated_lufs as musician_integrated_lufs
 from audio.metrics import rms_dbfs as musician_rms_dbfs
 from audio.modules import AmplitudeEnvelope, OnePoleLowPass, SineOscillator
 from audio.tracker_bridge import PatternPerformanceBridge
+from tracker import MutationPreviewService, PatternEditor, PlaybackWorker
 
 
 @dataclass
@@ -680,6 +681,43 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
     }
 
 
+def run_tracker_preview_demo(settings: AudioSettings) -> dict[str, object]:
+    """Exercise the tracker preview worker with MutationPreviewService."""
+
+    from domain.models import Pattern, PatternStep
+
+    pattern = Pattern(
+        id="preview_pattern",
+        name="Preview Pattern",
+        length_steps=16,
+        steps=[PatternStep() for _ in range(16)],
+    )
+
+    editor = PatternEditor(pattern, steps_per_beat=6.0)
+    service = MutationPreviewService(editor)
+    summaries: List[dict[str, object]] = []
+    worker = PlaybackWorker(service)
+    worker.add_callback(lambda request: summaries.append(worker.describe_request(request)))
+
+    with service.preview_batch("paint chord"):
+        editor.set_step(0, note=60, velocity=100, instrument_id="demo_sampler")
+        editor.apply_effect(0, "length_beats", 1.5)
+        editor.set_step(6, note=64, velocity=108, instrument_id="demo_sampler")
+        editor.set_step(9, note=67, velocity=112, instrument_id="demo_sampler")
+
+    worker.process_pending()
+
+    editor.set_step(12, note=72, velocity=120, instrument_id="demo_sampler")
+    service.enqueue_mutation(editor.history[-1])
+    worker.process_pending()
+
+    return {
+        "mutations": len(editor.history),
+        "preview_requests": summaries,
+        "steps_per_beat": editor.steps_per_beat,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the audio engine skeleton prototype")
     parser.add_argument("--duration", type=float, default=1.0, help="How long to run the engine (seconds)")
@@ -711,6 +749,11 @@ def parse_args() -> argparse.Namespace:
         "--pattern-demo",
         action="store_true",
         help="Render the tracker pattern bridge demo and print beat loudness snapshots",
+    )
+    parser.add_argument(
+        "--tracker-preview-demo",
+        action="store_true",
+        help="Queue tracker preview requests via the Step 4 playback worker",
     )
     return parser.parse_args()
 
@@ -804,6 +847,27 @@ def main() -> None:
             args.export_json.parent.mkdir(parents=True, exist_ok=True)
             args.export_json.write_text(json.dumps(payload, indent=2, sort_keys=True))
             logger.info("Wrote pattern demo summary to %s", args.export_json)
+        return
+    if args.tracker_preview_demo:
+        preview = run_tracker_preview_demo(settings)
+        logger.info(
+            "Tracker preview demo: %s mutations queued %s preview requests (resolution %.2f steps/beat)",
+            preview["mutations"],
+            len(preview["preview_requests"]),
+            preview["steps_per_beat"],
+        )
+        for request in preview["preview_requests"]:
+            logger.info(
+                "Preview %s @ %.2f beats (%.2f beats) → steps %s-%s note=%s vel=%s instrument=%s",
+                request["mutation_id"],
+                request["start_beat"],
+                request["duration_beats"],
+                request["start_step"],
+                request["end_step"],
+                request["note"],
+                request["velocity"],
+                request["instrument_id"],
+            )
         return
     engine = AudioEngine(settings=settings)
     engine.start()

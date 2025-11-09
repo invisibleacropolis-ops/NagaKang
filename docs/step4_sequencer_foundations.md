@@ -20,6 +20,10 @@ future undo/redo support.
 - `step_to_beat(index)` / `steps_to_beats(count)` – translate tracker grid
   indices into beat values using the configurable `steps_per_beat` resolution so
   sequencer services can stay tempo-aware without duplicating math.
+- `beats_to_steps(beats)` / `beat_to_step(beat_position)` /
+  `beat_window_to_step_range(start_beat, duration)` – expose the inverse helper
+  set so the playback worker can translate preview beats back into step windows
+  when scheduling renders or annotating CLI output.
 - `undo(steps)` / `redo(steps)` – revert or replay the most recent mutations
   while exposing `undo_stack` / `redo_stack` so the UI can reflect pending
   history. Each mutation carries a stable `mutation_id` that ties into the
@@ -60,6 +64,17 @@ future undo/redo support.
   sequencer service so Step 4 prototypes can hand them to
   `PatternPerformanceBridge` for offline renders.
 
+## PlaybackWorker prototype
+
+- `tracker.playback_worker.PlaybackWorker` owns a
+  `MutationPreviewService`, draining preview requests in FIFO order and
+  broadcasting each to registered callbacks.
+- `describe_request(request)` folds in the editor's beat/step helpers so CLI
+  demos can log both beat and tracker step windows without repeating math.
+- The tracker CLI skeleton (`prototypes/audio_engine_skeleton.py`) now exposes a
+  `--tracker-preview-demo` flag that records a preview batch and single note
+  edit, logging the queued requests with beat/step spans for smoke testing.
+
 ## Tracker-grid gesture sketch
 
 - **Tap / keyboard entry:** Call `PatternEditor.set_step()` then pass the final
@@ -77,8 +92,6 @@ future undo/redo support.
 
 ## Next steps
 
-- Introduce tempo-aware helpers that translate beats into step indices for the
-  playback scheduler.
 - Wire `PlaybackQueue` into a sequencer service that streams preview requests to
   `PatternPerformanceBridge` without blocking the tracker grid.
 - Sketch tracker-grid interaction flows that map pointer/multi-touch gestures to

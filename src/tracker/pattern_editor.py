@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import math
 from typing import Iterable, Iterator, List
 
 from domain.models import Pattern, PatternStep
@@ -146,6 +147,27 @@ class PatternEditor:
         """Convert an arbitrary step span into beats respecting the resolution."""
 
         return max(0.0, float(steps)) / self._steps_per_beat
+
+    def beats_to_steps(self, beats: float) -> float:
+        """Convert a beat span into tracker steps respecting the resolution."""
+
+        return max(0.0, float(beats)) * self._steps_per_beat
+
+    def beat_to_step(self, beat_position: float) -> int:
+        """Return the zero-based step index covering the provided beat position."""
+
+        return int(math.floor(max(0.0, float(beat_position)) * self._steps_per_beat))
+
+    def beat_window_to_step_range(self, start_beat: float, duration_beats: float) -> tuple[int, int]:
+        """Return inclusive start/end step indices that cover a beat window."""
+
+        start_index = self.beat_to_step(start_beat)
+        end_beat = max(start_beat, start_beat + max(0.0, float(duration_beats)))
+        if end_beat == start_beat:
+            end_index = start_index
+        else:
+            end_index = max(start_index, int(math.ceil(self.beats_to_steps(end_beat)) - 1))
+        return start_index, end_index
 
     def set_step(
         self,
