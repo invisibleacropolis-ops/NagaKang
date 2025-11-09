@@ -32,6 +32,9 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 addopts = "--maxfail=1 --disable-warnings"
 pythonpath = ["src"]
+markers = [
+    "requires_numpy: marks tests that rely on the optional numpy dependency",
+]
 
 [tool.ruff]
 line-length = 100
