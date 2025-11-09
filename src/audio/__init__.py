@@ -7,6 +7,7 @@ from .engine import (
     ParameterSpec,
     TempoMap,
 )
+from .mixer import MixerChannel, MixerGraph, MixerReturnBus, MixerSendConfig
 from .metrics import integrated_lufs, rms_dbfs, rms_per_channel
 from .modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
 from .tracker_bridge import PatternPerformanceBridge, PatternPlayback
@@ -18,6 +19,10 @@ __all__ = [
     "OfflineAudioEngine",
     "ParameterSpec",
     "TempoMap",
+    "MixerChannel",
+    "MixerGraph",
+    "MixerReturnBus",
+    "MixerSendConfig",
     "AmplitudeEnvelope",
     "ClipSampler",
     "PatternPerformanceBridge",
