@@ -90,6 +90,54 @@ def test_playback_worker_streams_requests_into_pattern_bridge():
     assert all(summary["peak_amplitude"] >= summary["rms_amplitude"] for summary in render_summaries)
 
 
+def test_playback_worker_reuses_bridge_renders(monkeypatch):
+    pytest.importorskip("numpy")
+
+    pattern = _make_pattern(8)
+    editor = PatternEditor(pattern, steps_per_beat=4.0)
+    service = MutationPreviewService(editor)
+
+    config = EngineConfig(sample_rate=12_000, block_size=128, channels=2)
+    tempo = TempoMap(tempo_bpm=100.0)
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Preview Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine_oscillator",
+                parameters={"amplitude": 0.25, "frequency_hz": 330.0},
+            )
+        ],
+    )
+    bridge = PatternPerformanceBridge(config, tempo)
+
+    call_count = {"render_pattern": 0}
+
+    original_render = bridge.render_pattern
+
+    def _wrapped_render(pattern, instrument_definition):
+        call_count["render_pattern"] += 1
+        return original_render(pattern, instrument_definition)
+
+    monkeypatch.setattr(bridge, "render_pattern", _wrapped_render)
+
+    worker = PlaybackWorker(
+        service,
+        bridge=bridge,
+        instruments={instrument.id: instrument},
+        default_instrument_id=instrument.id,
+    )
+
+    with service.preview_batch("two notes"):
+        editor.set_step(0, note=60, velocity=96, instrument_id=instrument.id)
+        editor.set_step(2, note=64, velocity=98, instrument_id=instrument.id)
+
+    worker.process_pending()
+
+    assert call_count["render_pattern"] == 1
+
+
 @pytest.mark.asyncio
 async def test_playback_worker_process_pending_async_matches_sync():
     pattern = _make_pattern(4)

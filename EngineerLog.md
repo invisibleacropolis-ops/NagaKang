@@ -1,3 +1,44 @@
+# Session Summary (Step 4 Preview Cache & Step 5 Node Graph Kickoff – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–5 & §9) to ground the
+  preview caching work and Step 5 graph scaffolding in the musician-first
+  roadmap before editing code or docs.
+- Extended `tracker.PlaybackWorker.process_pending()` with per-instrument render
+  caching so batched preview drains reuse a single
+  `PatternPerformanceBridge.render_pattern()` call. Added regression coverage to
+  verify bridge reuse alongside existing render metrics. (Step 4 sequencer
+  foundations completion: ~54% ➜ ~60%)
+- Introduced `docs.step3_tracker_notebook_widget.PreviewRenderCache`, notebook
+  preview widgets, and waveform down-sampling so rehearsal dashboards can retain
+  lightweight `PreviewRender` slices. Documented the async draining flow and
+  notebook caching behaviour in `docs/step4_sequencer_foundations.md` for
+  external engineers. (Step 4 documentation completion: ~97% ➜ 100%)
+- Authored `audio.node_graph` graph primitives (`NodePort`, `NodeDefinition`,
+  `NodeInstance`, `Connection`, `NodeGraph`) plus serialization helpers and
+  topological ordering tests, establishing the first Step 5 node-builder code
+  path. Captured the design notes in
+  `docs/step5_node_builder_kickoff.md`. (Step 5 node builder foundation
+  completion: ~0% ➜ ~12%)
+- Added regression suites for the preview cache widgets and node-graph helpers,
+  registering a `requires_numpy` pytest marker to keep optional dependency tests
+  explicit. Ran `poetry run pytest` across the full test suite.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 5 Node Builder Graph Commands (~12% ➜ 25%)**
+   - Layer duplication/replacement helpers onto `audio.node_graph.NodeGraph`,
+     prototype undo-friendly edit commands, and sketch the binding plan for the
+     forthcoming Kivy node-canvas.
+
 # Session Summary (Step 4 Preview Renders & Async Draining – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–4 & §9) to keep the
   preview streaming work aligned with the musician-first playback roadmap before
@@ -750,4 +791,3 @@
 4. **Windows Installer Enablement (~40% ➜ 55%)**
    - Document PyInstaller/WiX prerequisites and rehearse the bundler on a
      Windows VM, capturing screenshots for the installer flow.
-

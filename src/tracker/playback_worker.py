@@ -129,10 +129,11 @@ class PlaybackWorker:
 
         requests = self._service.drain_requests()
         renders: List[PreviewRender] = []
+        playback_cache: Dict[str, "PatternPlayback"] = {}
         for request in requests:
             for callback in self._callbacks:
                 callback(request)
-            preview = self._render_request(request)
+            preview = self._render_request(request, playback_cache)
             if preview is not None:
                 renders.append(preview)
                 for render_callback in self._render_callbacks:
@@ -200,7 +201,11 @@ class PlaybackWorker:
                 instrument = self._instruments.get(instrument_id)
         return instrument
 
-    def _render_request(self, request: PlaybackRequest) -> PreviewRender | None:
+    def _render_request(
+        self,
+        request: PlaybackRequest,
+        playback_cache: Dict[str, "PatternPlayback"] | None = None,
+    ) -> PreviewRender | None:
         if self._bridge is None:
             return None
 
@@ -213,7 +218,16 @@ class PlaybackWorker:
         except ImportError:  # pragma: no cover - optional dependency guard
             return None
 
-        playback = self._bridge.render_pattern(self.editor.pattern, instrument)
+        cache_key = instrument.id
+        playback: "PatternPlayback" | None = None
+        if playback_cache is not None:
+            playback = playback_cache.get(cache_key)
+
+        if playback is None:
+            playback = self._bridge.render_pattern(self.editor.pattern, instrument)
+            if playback_cache is not None:
+                playback_cache[cache_key] = playback
+
         sample_rate = int(self._bridge.config.sample_rate)
         total_frames = playback.buffer.shape[0]
         start_seconds = self._bridge.tempo.beats_to_seconds(max(0.0, request.start_beat))

@@ -76,9 +76,39 @@ future undo/redo support.
   amplitudes and step-aligned frame slices for tracker overlays.
 - `process_pending_async()` mirrors the synchronous drain but executes in a
   background thread so UI event loops can keep painting while previews stream.
+- Batched preview runs reuse the most recent `PatternPerformanceBridge`
+  playback per instrument so notebook dashboards can slice windows without
+  re-rendering identical buffers for every queued mutation.
 - The tracker CLI skeleton (`prototypes/audio_engine_skeleton.py`) records both
   the request summaries and render metrics (frames, seconds, peak/rms) when
   `--tracker-preview-demo` is enabled.
+
+### Async draining overview
+
+1. `MutationPreviewService.preview_batch()` wraps tracker gestures, ensuring all
+   queued mutations share a batch label for downstream dashboards.
+2. UI code calls `await PlaybackWorker.process_pending_async()` from an async
+   cell or event handler. The worker offloads draining and bridge rendering to a
+   background thread using `asyncio.to_thread()`.
+3. Request callbacks fire on the worker thread after dequeuing each
+   `PlaybackRequest`, keeping CLI logs and notebook breadcrumbs in sync with the
+   mutation sequence.
+4. Render callbacks receive cached `PreviewRender` windows where available, so
+   UI subscribers update amplitude overlays without blocking the main loop.
+5. Once the coroutine resolves, notebook widgets can safely read
+   `PlaybackWorker.last_render_batch()` to hydrate dashboards while the tracker
+   grid stays responsive.
+
+### Notebook preview caching
+
+- `docs.step3_tracker_notebook_widget.PreviewRenderCache` records the most
+  recent preview windows, trimming the cache to a configurable size so rehearsal
+  notebooks never overwhelm browser sessions.
+- Cached entries store beat spans, amplitude metrics, duration in seconds, and a
+  lightweight down-sampled waveform preview for quick visual inspection.
+- `build_preview_render_widget()` renders the cached slices alongside loudness
+  and smoothing summaries, while text fallbacks expose the same data for headless
+  or minimal notebook environments.
 
 ### Preview callback wiring
 
