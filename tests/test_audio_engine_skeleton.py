@@ -11,6 +11,7 @@ from prototypes.audio_engine_skeleton import (
     StressTestScenario,
     load_stress_plan,
     render_musician_demo_patch,
+    render_pattern_bridge_demo,
     run_stress_test_scenarios,
 )
 
@@ -181,6 +182,21 @@ def test_stress_scenario_runner_exports_csv_and_json(tmp_path):
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload[0]["scenario"] == "Baseline"
     assert payload[0]["callbacks"] == results[0]["callbacks"]
+
+
+def test_pattern_bridge_demo_summary_includes_smoothing_totals():
+    settings = AudioSettings(sample_rate=48_000, block_size=256, channels=2, tempo_bpm=120.0)
+    summary = render_pattern_bridge_demo(settings)
+
+    smoothing_rows = summary["automation_smoothing"]
+    assert smoothing_rows, "Expected smoothing rows to be present"
+    first_row = smoothing_rows[0]
+    assert first_row["segment_total"] >= 1
+    assert isinstance(first_row.get("segment_breakdown"), dict)
+
+    smoothing_summary = summary["automation_smoothing_summary"]
+    assert smoothing_summary["rows"] == len(smoothing_rows)
+    assert smoothing_summary["segment_total"] >= first_row["segment_total"]
 
 
 def test_load_stress_plan_parses_settings(tmp_path):

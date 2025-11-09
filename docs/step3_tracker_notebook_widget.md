@@ -99,8 +99,9 @@ smoothing = bridge.automation_smoothing_rows(playback)
 show_tracker_dashboard(rows, smoothing)
 ```
 
-- **Applied** ramps show teal badges with beat, strategy, and segment count so
-  facilitators can explain how aggressive fades were softened.
+- **Applied** ramps show teal badges with beat, strategy, and the full segment
+  breakdown (`Segments: 14 total (lane_a=5, lane_b=9)`) so facilitators can
+  explain how aggressive fades were softened.
 - **Pending** entries appear when lanes were averaged but no ramp was scheduled,
   keeping the audit trail visible without duplicating the automation log.
 - Both panels now share container spacing and border tokens, so dropping them
