@@ -823,3 +823,43 @@
 4. **Windows Installer Enablement (~40% ➜ 55%)**
    - Document PyInstaller/WiX prerequisites and rehearse the bundler on a
      Windows VM, capturing screenshots for the installer flow.
+# Session Summary (Step 6 Mixer Graph Kickoff – Effects & Routing)
+- Reviewed the Comprehensive Development Plan (README §6 and §9) to
+  align mixer scaffolding with the stated routing, effects, and QA
+  expectations before authoring code or docs.
+- Implemented `audio.mixer` with `MixerChannel`, `MixerSendConfig`,
+  `MixerReturnBus`, and `MixerGraph`, providing musician-facing pan,
+  fader, mute, insert, and auxiliary send controls plus block-based
+  summing that future DSP modules can reuse. (Step 6 mixer architecture
+  completion: ~0% ➜ ~18%)
+- Added regression coverage in `tests/test_audio_mixer.py` verifying pan
+  + fader interaction and pre-fader send routing into a return bus,
+  proving the auxiliary mix flow works end to end. (Step 6 regression
+  coverage completion: ~0% ➜ ~15%)
+- Authored `docs/step6_mixer_kickoff.md`, detailing the new routing
+  primitives, auxiliary workflow, and the planned Kivy mixer layout so
+  external collaborators can align UI prototypes with the backend graph.
+  Updated `docs/documentation_structure.md` to reference the Step 6
+  briefing. (Step 6 documentation completion: ~0% ➜ ~20%)
+- Ran `poetry run pytest` to confirm the expanded audio suite and
+  existing regressions remain green.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3
+     bucket, attach LUFS metadata, and share the JSON export workflow
+     with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture
+     annotated screenshots pairing loudness grades with smoothing totals,
+     and land them in the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact
+     retention expectations with QA.
+4. **Step 6 Mixer Effects & Routing Expansion (~18% ➜ 30%)**
+   - Prototype EQ/compression inserts that satisfy the insert callable
+     contract, introduce subgroup/solo scaffolding inside
+     `audio.mixer.MixerGraph`, and begin wiring the Kivy mixer mock to
+     the new channel/bus APIs.
+
