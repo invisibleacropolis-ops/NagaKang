@@ -7,6 +7,7 @@ from .pattern_editor import (
     PlaybackRequest,
     StepMutation,
 )
+from .playback_worker import PlaybackWorker
 from .preview_service import MutationPreviewService
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "PlaybackQueue",
     "PlaybackRequest",
     "MutationPreviewService",
+    "PlaybackWorker",
 ]

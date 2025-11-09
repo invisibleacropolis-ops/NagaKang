@@ -1,3 +1,40 @@
+# Session Summary (Step 4 Playback Worker & Tracker CLI Preview – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–4 & §9) to keep the
+  playback worker prototype aligned with the musician-first sequencing goals
+  before updating code or docs.
+- Extended `tracker.PatternEditor` with inverse beat helpers
+  (`beats_to_steps()`, `beat_to_step()`, and `beat_window_to_step_range()`) so
+  preview scheduling can translate beat windows back to step spans without
+  duplicating math. (Step 4 sequencer foundations completion: ~36% ➜ ~44%)
+- Introduced `tracker.PlaybackWorker`, draining `MutationPreviewService`
+  requests, broadcasting callbacks, and surfacing CLI-friendly summaries that
+  reference the new beat-to-step helpers. (Step 4 sequencer foundations
+  completion: ~44% ➜ ~48%)
+- Added a `--tracker-preview-demo` flag to
+  `prototypes/audio_engine_skeleton.py`, recording preview batches and single
+  edits before logging beat/step spans for smoke testing. Updated the Step 4
+  sequencer notes to document the worker and CLI flow. (Step 4 documentation
+  completion: ~92% ➜ ~95%)
+- Ran `poetry run pytest` to cover the new playback worker, beat conversion
+  helpers, and CLI preview demo wiring end-to-end.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 4 Sequencer Foundations (~48% ➜ 52%)**
+   - Stream `PlaybackWorker` requests into `PatternPerformanceBridge` offline
+     renders, explore async draining for future UI threads, and capture preview
+     callback wiring diagrams in the Step 4 design notebook.
+
 # Session Summary (Step 4 Preview Service & Windows Dry Run – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–4 & §9) to align the
   preview workflow, smoothing dashboards, and installer automation with the
