@@ -98,12 +98,17 @@ def _format_smoothing_row_text(row: Mapping[str, object]) -> str:
     identifier = row.get("identifier") or row.get("event_id")
     label = identifier or row.get("label", "")
     strategy = row.get("strategy", "none")
-    segments = row.get("segments", 0)
+    segment_total = int(row.get("segment_total") or row.get("segments") or 0)
+    breakdown = row.get("segment_breakdown")
+    if isinstance(breakdown, Mapping) and breakdown:
+        segment_text = ", ".join(f"{name}={value}" for name, value in breakdown.items())
+    else:
+        segment_text = str(segment_total)
     state = "applied" if row.get("applied") else "pending"
     event_index = row.get("event_index")
     index_suffix = f" · #{event_index}" if event_index is not None else ""
     return (
-        f"{label} @ {beat:.2f} beats → {strategy} ({segments} segments, {state}{index_suffix})"
+        f"{label} @ {beat:.2f} beats → {strategy} ({segment_total} segments [{segment_text}], {state}{index_suffix})"
     )
 
 
@@ -131,6 +136,13 @@ def build_automation_smoothing_widget(rows: Iterable[Mapping[str, object]]):
         state = "applied" if row.get("applied") else "pending"
         color = SMOOTHING_COLORS.get(state, "#424242")
         label_token = str(row.get("identifier", row.get("label", "")))
+        segment_total = int(row.get("segment_total") or row.get("segments") or 0)
+        breakdown = row.get("segment_breakdown")
+        if isinstance(breakdown, Mapping) and breakdown:
+            breakdown_text = ", ".join(f"{name}={value}" for name, value in breakdown.items())
+            breakdown_html = f"<br/><small>Segments: {segment_total} total ({breakdown_text})</small>"
+        else:
+            breakdown_html = f"<br/><small>Segments: {segment_total}</small>"
         label = widgets.HTML(
             value=f"<span style='font-weight:600'>{label_token}</span>",
             layout=widgets.Layout(width="160px"),
@@ -140,7 +152,8 @@ def build_automation_smoothing_widget(rows: Iterable[Mapping[str, object]]):
                 f"<div style='background:{color};color:white;padding:4px 8px;border-radius:4px;'>"
                 f"Beat {float(row.get('beat', 0.0)):.2f} · "
                 f"{str(row.get('strategy', 'none')).title()} · "
-                f"{int(row.get('segments', 0))} segments"
+                f"{segment_total} segments"
+                f"{breakdown_html}"
                 "</div>"
             ),
             layout=widgets.Layout(flex="1"),

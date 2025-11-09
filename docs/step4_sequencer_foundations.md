@@ -45,6 +45,36 @@ future undo/redo support.
   (README §4), keeping playback orchestration separate from pattern editing so
   undo/redo remains instant even while offline renders spin.
 
+## MutationPreviewService prototype
+
+- `tracker.preview_service.MutationPreviewService` wraps a `PatternEditor` and
+  `PlaybackQueue`, providing high-level helpers that coordinate undo batches with
+  preview scheduling.
+- `preview_batch(label)` mirrors `PatternEditor.batch` but automatically queues
+  previews for each mutation once the block exits, ensuring drag gestures render
+  together without blocking the UI thread.
+- `enqueue_mutation(mutation, start_beat=None, step_duration_beats=None)` defers
+  to the editor's tempo-aware helpers so preview durations stay correct across
+  different `steps_per_beat` values.
+- `drain_requests()` hands the queued `PlaybackRequest` objects back to the
+  sequencer service so Step 4 prototypes can hand them to
+  `PatternPerformanceBridge` for offline renders.
+
+## Tracker-grid gesture sketch
+
+- **Tap / keyboard entry:** Call `PatternEditor.set_step()` then pass the final
+  mutation to `MutationPreviewService.enqueue_mutation()` so single notes preview
+  instantly.
+- **Drag chord paint:** Wrap the gesture in `MutationPreviewService.preview_batch(
+  "paint chord")` so undo/redo is atomic and the resulting playback queue emits
+  one request per touched step.
+- **Velocity ramp brush:** Combine `PatternEditor.apply_effect()` calls inside a
+  preview batch; downstream automation overlays receive the matching mutation
+  IDs for smoothing dashboards.
+- **Range rotate / duplicate:** Use the editor helpers, then iterate the batch's
+  mutations to queue previews selectively (e.g., only the destination slice)
+  before draining the queue into the playback worker thread.
+
 ## Next steps
 
 - Introduce tempo-aware helpers that translate beats into step indices for the

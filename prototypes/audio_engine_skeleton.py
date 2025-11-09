@@ -663,11 +663,20 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
     playback = bridge.render_pattern(pattern, instrument)
     loudness = bridge.loudness_trends(playback, beats_per_bucket=1.0)
     smoothing_rows = bridge.automation_smoothing_rows(playback)
+    smoothing_total = sum(
+        int(row.get("segment_total") or row.get("segments") or 0)
+        for row in smoothing_rows
+        if isinstance(row, dict)
+    )
     return {
         "duration_seconds": playback.duration_seconds,
         "beat_loudness": loudness,
         "automation_events": playback.automation_log,
         "automation_smoothing": smoothing_rows,
+        "automation_smoothing_summary": {
+            "rows": len(smoothing_rows),
+            "segment_total": smoothing_total,
+        },
     }
 
 
@@ -773,18 +782,20 @@ def main() -> None:
                 breakdown = row.get("segment_breakdown")
                 if isinstance(breakdown, dict) and breakdown:
                     parts = ", ".join(f"{name}={value}" for name, value in breakdown.items())
+                    segment_copy = f"{segment_total} total ({parts})"
                 else:
-                    parts = str(segment_total)
+                    segment_copy = f"{segment_total} total"
                 logger.info(
                     "Smoothing %s: %s segments over %.2f beats (%s)",
                     event_id,
-                    parts,
+                    segment_copy,
                     window_beats,
                     state,
                 )
-            logger.info(
-                "Smoothing summary: %s rows, %s segments", len(smoothing_rows), total_segments
-            )
+            summary_row = summary.get("automation_smoothing_summary", {})  # type: ignore[index]
+            rows = summary_row.get("rows", len(smoothing_rows))
+            segments = summary_row.get("segment_total", total_segments)
+            logger.info("Smoothing summary: %s rows, %s segments", rows, segments)
         if args.export_json:
             payload = {
                 "demo": "pattern",

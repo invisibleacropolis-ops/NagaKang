@@ -171,6 +171,12 @@ spot automation clashes that were gently massaged during rendering. Feed
 `automation_smoothing_rows` into the updated notebook widget to turn those
 payloads into musician-friendly dashboard badges.
 
+Running `python prototypes/audio_engine_skeleton.py --pattern-demo --export-json demo.json`
+now writes an `automation_smoothing_summary` alongside the raw rows. The summary
+tracks how many smoothing entries were generated and the total segment count so
+remote QA can diff CLI exports against notebook screenshots without replaying
+audio renders.
+
 ## Next Steps
 
 - Layer additional sampler voices by instantiating multiple `ClipSampler`

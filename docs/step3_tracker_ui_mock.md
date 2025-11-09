@@ -74,7 +74,9 @@ Embed the palette directly into the mock `kv` file:
   `docs/step3_tracker_notebook_widget.py::GRADE_COLORS`.
 - Pair the loudness column with a second `BoxLayout` that lists smoothing badges
   using the teal/brown colours defined in
-  `docs/step3_tracker_notebook_widget.py::SMOOTHING_COLORS`.
+  `docs/step3_tracker_notebook_widget.py::SMOOTHING_COLORS`, and add a second
+  label row for the `Segments: {total} ({lane_a=5, lane_b=9})` copy now emitted
+  by the notebook helper so rehearsal screenshots match the CLI JSON export.
 
 ## Implementation checklist
 
@@ -87,4 +89,5 @@ Embed the palette directly into the mock `kv` file:
 4. Capture annotated screenshots once the mock is wired so the asset pack can
    ship alongside the Windows installer preview. Store the Windows HiDPI capture
    under `docs/assets/ui/windows_hidpi_tracker_dashboard.png` for the release
-   playbook.
+   playbook, annotating the new segment breakdown row beneath each smoothing
+   badge.

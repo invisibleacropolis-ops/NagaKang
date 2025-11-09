@@ -1,3 +1,44 @@
+# Session Summary (Step 4 Preview Service & Windows Dry Run – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–4 & §9) to align the
+  preview workflow, smoothing dashboards, and installer automation with the
+  musician-first roadmap before touching code or docs.
+- Implemented `tracker.MutationPreviewService` to wrap `PatternEditor` batches,
+  automatically enqueueing tempo-aware playback previews and adding coverage for
+  varied `steps_per_beat` timings. (Step 4 sequencer foundations completion:
+  ~26% ➜ ~36%)
+- Extended the tracker notebook widget and rehearsal docs to surface
+  `segment_breakdown` and aggregated smoothing counts, refreshed the pattern
+  bridge CLI export with `automation_smoothing_summary`, and added regression
+  tests so remote QA can diff JSON payloads against dashboard badges. (Pattern
+  bridge automation completion: ~98% ➜ 100%)
+- Drafted the Windows PyInstaller dry-run workflow (`windows-bundle-dryrun.yml`)
+  capturing the generated command in an uploaded log so release managers can
+  audit the pipeline ahead of artifact signing. (Windows installer enablement
+  completion: ~62% ➜ ~66%)
+- Updated the Step 4 sequencer design notes with gesture flows that tie the new
+  preview service to undo batching, ensuring outside engineers have actionable
+  guidance before the playback worker lands. (Documentation for sequencer
+  foundations completion: ~89% ➜ ~92%)
+- Ran `poetry run pytest` to cover the new preview service, audio skeleton
+  summary assertions, and notebook helper updates end-to-end.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 4 Sequencer Foundations (~36% ➜ 44%)**
+   - Prototype the playback worker that drains `MutationPreviewService`
+     requests, add beat-to-step helpers for scheduling, and wire preview
+     callbacks into the tracker CLI demo for smoke tests.
+
 # Session Summary (Step 4 Mutation Batching & Tracker CLI Updates – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–4 & §9) so the Step 4
   batching work and automation dashboards continued to map to the musician-first

@@ -1,0 +1,54 @@
+name: Windows Bundle Dry Run
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    paths:
+      - "tools/build_windows_bundle.py"
+      - ".github/workflows/windows-bundle-dryrun.yml"
+
+jobs:
+  dry-run:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run PyInstaller dry run
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist-ci\logs -Force | Out-Null
+          $logPath = "dist-ci/logs/pyinstaller-dry-run.txt"
+          poetry run python tools/build_windows_bundle.py --dry-run --dist-dir dist-ci --build-dir build-ci 2>&1 | Tee-Object -FilePath $logPath
+
+      - name: Summarise dry run output
+        shell: pwsh
+        run: |
+          $logPath = "dist-ci/logs/pyinstaller-dry-run.txt"
+          if (Test-Path $logPath) {
+            $content = Get-Content $logPath | Select-String -Pattern "pyinstaller"
+            Add-Content $env:GITHUB_STEP_SUMMARY "## Windows bundle dry run"
+            Add-Content $env:GITHUB_STEP_SUMMARY "``````"
+            Add-Content $env:GITHUB_STEP_SUMMARY ($content -join "`n")
+            Add-Content $env:GITHUB_STEP_SUMMARY "``````"
+          }
+
+      - name: Upload dry run logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle-dry-run
+          path: dist-ci/logs
