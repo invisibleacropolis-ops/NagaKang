@@ -1,8 +1,15 @@
 import numpy as np
+import pytest
 
-from audio.effects import SoftKneeCompressorInsert, ThreeBandEqInsert
+from audio.effects import (
+    PlateReverbInsert,
+    SoftKneeCompressorInsert,
+    StereoFeedbackDelayInsert,
+    ThreeBandEqInsert,
+)
 from audio.engine import BaseAudioModule, EngineConfig
 from audio.mixer import (
+    MeterReading,
     MixerChannel,
     MixerGraph,
     MixerReturnBus,
@@ -57,6 +64,41 @@ def test_send_routes_audio_to_return_bus() -> None:
     send_level = 0.25 * 10 ** (-3 / 20)
     return_expected = np.full((4, 2), send_level * 2.0, dtype=np.float32)
     np.testing.assert_allclose(block, direct_expected + return_expected)
+
+
+def test_feedback_delay_tail_persists_across_blocks() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=64, channels=2)
+    delay = StereoFeedbackDelayInsert(
+        config,
+        delay_ms=1.0,
+        feedback=0.4,
+        mix=1.0,
+    )
+    impulse = np.zeros((64, 2), dtype=np.float32)
+    impulse[0, :] = 1.0
+    first = delay(impulse)
+    second = delay(np.zeros_like(impulse))
+    delay_samples = int(round(1.0 * config.sample_rate / 1_000.0))
+    assert np.any(np.abs(first[delay_samples:]) > 0.0)
+    assert np.any(np.abs(second) > 0.0)
+
+
+def test_plate_reverb_emits_continuing_tail() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=64, channels=2)
+    reverb = PlateReverbInsert(
+        config,
+        pre_delay_ms=0.0,
+        mix=1.0,
+        decay=0.6,
+    )
+    impulse = np.zeros((64, 2), dtype=np.float32)
+    impulse[0, :] = 1.0
+    first = reverb(impulse)
+    second = reverb(np.zeros_like(impulse))
+    tail = reverb(np.zeros((2048, 2), dtype=np.float32))
+    combined = np.vstack([first, second, tail])
+    assert np.any(np.abs(combined) > 0.0)
+    assert np.any(np.abs(tail[-256:]) > 0.0)
 
 
 def test_three_band_eq_enhances_highs() -> None:
@@ -120,3 +162,39 @@ def test_subgroup_routing_and_solo_logic() -> None:
     block = mixer.process_block(4)
     expected = (0.5 + 0.25) * 10 ** (-6 / 20)
     np.testing.assert_allclose(block, np.full((4, 2), expected, dtype=np.float32))
+
+
+def test_nested_subgroup_routing_and_metering() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
+    drums = MixerSubgroup("drums", config=config, fader_db=-6.0)
+    band = MixerSubgroup("band", config=config, fader_db=0.0)
+    mixer = MixerGraph(config)
+    mixer.add_subgroup(drums)
+    mixer.add_subgroup(band)
+    mixer.assign_subgroup_to_group("drums", "band")
+
+    kick = MixerChannel(
+        "kick",
+        source=ConstantModule("kick_src", config, value=0.5),
+        config=config,
+    )
+    snare = MixerChannel(
+        "snare",
+        source=ConstantModule("snare_src", config, value=0.25),
+        config=config,
+    )
+    mixer.add_channel(kick)
+    mixer.add_channel(snare)
+    mixer.assign_channel_to_group("kick", "drums")
+    mixer.assign_channel_to_group("snare", "drums")
+
+    block = mixer.process_block(4)
+    expected_linear = (0.5 + 0.25) * 10 ** (-6 / 20)
+    np.testing.assert_allclose(block, np.full((4, 2), expected_linear, dtype=np.float32))
+
+    meters = mixer.subgroup_meters
+    assert set(meters) == {"drums", "band"}
+    expected_peak_db = float(20.0 * np.log10(expected_linear))
+    assert isinstance(meters["drums"], MeterReading)
+    assert meters["drums"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
+    assert meters["band"].peak_db == pytest.approx(expected_peak_db, abs=0.5)

@@ -30,6 +30,20 @@ def _db_to_linear(value_db: float) -> float:
 
 
 @dataclass
+class MeterReading:
+    """Represents a snapshot of signal level in decibels."""
+
+    peak_db: float
+    rms_db: float
+
+
+def _linear_to_db(value: float) -> float:
+    if value <= 0.0:
+        return -float("inf")
+    return 20.0 * math.log10(value)
+
+
+@dataclass
 class MixerSendConfig:
     """Configuration describing how a channel feeds an auxiliary bus."""
 
@@ -181,6 +195,7 @@ class MixerSubgroup:
         self._fader_gain = _db_to_linear(fader_db)
         self._muted = muted
         self._solo = solo
+        self._last_meter = MeterReading(peak_db=-float("inf"), rms_db=-float("inf"))
 
     def add_insert(self, processor: InsertProcessor) -> None:
         self._inserts.append(processor)
@@ -213,7 +228,17 @@ class MixerSubgroup:
             working.fill(0.0)
         else:
             working *= self._fader_gain
+        peak = float(np.max(np.abs(working))) if working.size else 0.0
+        rms = float(np.sqrt(np.mean(np.square(working)))) if working.size else 0.0
+        self._last_meter = MeterReading(
+            peak_db=_linear_to_db(peak),
+            rms_db=_linear_to_db(rms),
+        )
         return working
+
+    @property
+    def last_meter(self) -> MeterReading:
+        return self._last_meter
 
 
 class MixerReturnBus:
@@ -250,9 +275,11 @@ class MixerGraph:
         self._channels: MutableMapping[str, MixerChannel] = {}
         self._subgroups: MutableMapping[str, MixerSubgroup] = {}
         self._channel_groups: Dict[str, str] = {}
+        self._subgroup_routes: Dict[str, str] = {}
         self._returns: MutableMapping[str, MixerReturnBus] = {}
         self._master_fader_db = master_fader_db
         self._master_gain = _db_to_linear(master_fader_db)
+        self._last_subgroup_meters: Dict[str, MeterReading] = {}
 
     def add_channel(self, channel: MixerChannel) -> None:
         if channel.name in self._channels:
@@ -279,6 +306,18 @@ class MixerGraph:
     def clear_channel_group(self, channel_name: str) -> None:
         self._channel_groups.pop(channel_name, None)
 
+    def assign_subgroup_to_group(self, subgroup_name: str, parent_name: str) -> None:
+        if subgroup_name not in self._subgroups:
+            raise KeyError(f"Unknown subgroup '{subgroup_name}'")
+        if parent_name not in self._subgroups:
+            raise KeyError(f"Unknown subgroup '{parent_name}'")
+        if subgroup_name == parent_name:
+            raise ValueError("Subgroup cannot target itself")
+        self._subgroup_routes[subgroup_name] = parent_name
+
+    def clear_subgroup_group(self, subgroup_name: str) -> None:
+        self._subgroup_routes.pop(subgroup_name, None)
+
     def set_master_fader_db(self, value: float) -> None:
         self._master_fader_db = float(value)
         self._master_gain = _db_to_linear(self._master_fader_db)
@@ -288,12 +327,55 @@ class MixerGraph:
         return dict(self._channels)
 
     @property
+    def channel_groups(self) -> Mapping[str, str]:  # pragma: no cover - trivial view
+        return dict(self._channel_groups)
+
+    @property
     def subgroups(self) -> Mapping[str, MixerSubgroup]:  # pragma: no cover - trivial view
         return dict(self._subgroups)
 
     @property
     def returns(self) -> Mapping[str, MixerReturnBus]:  # pragma: no cover - trivial view
         return dict(self._returns)
+
+    @property
+    def subgroup_meters(self) -> Mapping[str, MeterReading]:
+        return dict(self._last_subgroup_meters)
+
+    def _subgroup_children(self) -> Dict[str, Set[str]]:
+        children: Dict[str, Set[str]] = {name: set() for name in self._subgroups}
+        for child, parent in self._subgroup_routes.items():
+            if child not in children:
+                raise KeyError(f"Unknown subgroup '{child}' in routing table")
+            if parent not in children:
+                raise KeyError(f"Unknown subgroup '{parent}' in routing table")
+            children[parent].add(child)
+        return children
+
+    def _ordered_subgroups(self) -> Iterable[str]:
+        children = self._subgroup_children()
+        visited: Set[str] = set()
+        stack: Set[str] = set()
+        order: list[str] = []
+
+        def dfs(name: str) -> None:
+            if name in visited:
+                return
+            if name in stack:
+                raise ValueError("Subgroup routing contains a cycle")
+            stack.add(name)
+            for child in children[name]:
+                dfs(child)
+            stack.remove(name)
+            visited.add(name)
+            order.append(name)
+
+        roots = [name for name in self._subgroups if name not in self._subgroup_routes]
+        for root in roots:
+            dfs(root)
+        for name in self._subgroups:
+            dfs(name)
+        return order
 
     def process_block(self, frames: int) -> np.ndarray:
         master = np.zeros((frames, self.config.channels), dtype=np.float32)
@@ -314,8 +396,12 @@ class MixerGraph:
         }
         if solo_groups:
             for channel_name, group_name in self._channel_groups.items():
-                if group_name in solo_groups:
-                    solo_channels.add(channel_name)
+                current = group_name
+                while current is not None:
+                    if current in solo_groups:
+                        solo_channels.add(channel_name)
+                        break
+                    current = self._subgroup_routes.get(current)
         if solo_channels:
             active_channels = solo_channels
         else:
@@ -341,14 +427,22 @@ class MixerGraph:
                     )
                 send_sums[bus] += buffer
 
-        for name, subgroup in self._subgroups.items():
+        meters: Dict[str, MeterReading] = {}
+        for name in self._ordered_subgroups():
+            subgroup = self._subgroups[name]
             processed = subgroup.process(group_sums[name])
-            master += processed
+            meters[name] = subgroup.last_meter
+            parent = self._subgroup_routes.get(name)
+            if parent is not None:
+                group_sums[parent] += processed
+            else:
+                master += processed
 
         for name, bus in self._returns.items():
             processed = bus.process(send_sums[name])
             master += processed
 
+        self._last_subgroup_meters = meters
         return master * self._master_gain
 
     def render(self, duration_seconds: float) -> np.ndarray:
@@ -363,6 +457,7 @@ class MixerGraph:
 
 __all__ = [
     "InsertProcessor",
+    "MeterReading",
     "MixerChannel",
     "MixerGraph",
     "MixerSubgroup",
