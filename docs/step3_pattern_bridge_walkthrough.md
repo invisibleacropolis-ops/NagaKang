@@ -55,15 +55,18 @@ pattern grid.
    [INFO] Pattern beats 1.0–2.0: RMS L/R -26.5/-26.4 dBFS, -28.3 LUFS
    [INFO] Pattern beats 2.0–3.0: RMS L/R -11.8/-11.7 dBFS, -11.2 LUFS
    [INFO] Pattern demo automation events: 8
-   [INFO] Smoothing filter.cutoff_hz@0.0000#11: 5 segments over 0.01 beats (pending)
-   [INFO] Smoothing filter.cutoff_hz@2.0000#12: 5 segments over 0.01 beats (applied)
-   [INFO] Smoothing summary: 2 events, 10 segments
+   [INFO] Smoothing filter.cutoff_hz@0.0000#11: filter.cutoff_hz|smooth=6ms:5=5 segments over 0.01 beats (pending)
+   [INFO] Smoothing filter.cutoff_hz@2.0000#12: filter.cutoff_hz|smooth=6ms:5=5 segments over 0.01 beats (applied)
+   [INFO] Smoothing summary: 2 rows, 10 segments
    ```
 
    Use the RMS/LUFS swings to decide whether the second hit needs extra layering
    or whether the envelope release should stretch. The smoothing lines highlight
-   how many intermediate points were inserted on the filter lane so Step 4
-   undo/redo tooling can reconcile notebook dashboards with tracker playback.
+   how many intermediate points were inserted on each contributing lane so Step 4
+   undo/redo tooling can reconcile notebook dashboards with tracker playback. The
+   optional `--export-json` flag writes the same payload (including
+   `event_id`-tagged automation entries and `segment_breakdown` totals) for QA
+   packaging into rehearsal notes or cloud dashboards.
 
 ## Layering Your Own Pattern
 

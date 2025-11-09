@@ -1,10 +1,7 @@
-from domain.models import Pattern
+import pytest
 
-from tracker import PatternEditor
-
-
-def _make_pattern(length_steps: int = 8) -> Pattern:
-    return Pattern(id="pat", name="Pattern", length_steps=length_steps)
+from domain.models import Pattern, PatternStep
+from tracker.pattern_editor import MutationBatch, PlaybackQueue, PatternEditor
 
 
 def test_set_step_records_history():
@@ -124,7 +121,7 @@ def test_queue_mutation_preview_enqueues_requests():
 
     assert request.mutation_id == mutation.mutation_id
     assert request.index == 3
-    assert request.start_beat == 1.5
+    assert request.start_beat == pytest.approx(0.75)
     assert request.duration_beats == 0.5
     assert request.note == 72
     assert request.velocity == 95
@@ -134,5 +131,57 @@ def test_queue_mutation_preview_enqueues_requests():
     popped = queue.pop_next()
     assert popped == request
     assert queue.pop_next() is None
-from domain.models import Pattern, PatternStep
-from tracker.pattern_editor import PlaybackQueue, PatternEditor
+
+
+def test_batch_groups_mutations_for_undo_redo():
+    pattern = _make_pattern(8)
+    editor = PatternEditor(pattern)
+
+    with editor.batch("drag chord"):
+        editor.set_step(0, note=60)
+        editor.set_step(1, note=64)
+        editor.set_step(2, note=67)
+
+    assert len(editor.history) == 3
+    assert len(editor.undo_stack) == 1
+    batch_entry = editor.undo_stack[-1]
+    assert isinstance(batch_entry, MutationBatch)
+    assert [mutation.index for mutation in batch_entry.mutations] == [0, 1, 2]
+
+    undone = editor.undo()
+    assert [mutation.index for mutation in undone] == [2, 1, 0]
+    assert all(pattern.steps[idx].note is None for idx in range(3))
+    assert len(editor.redo_stack) == 1
+
+    replayed = editor.redo()
+    assert [mutation.index for mutation in replayed] == [0, 1, 2]
+    assert pattern.steps[0].note == 60
+    assert pattern.steps[1].note == 64
+    assert pattern.steps[2].note == 67
+
+
+def test_step_to_beat_and_preview_window_respect_resolution():
+    pattern = _make_pattern(16)
+    editor = PatternEditor(pattern, steps_per_beat=8.0)
+    editor.set_step(4, note=70, velocity=105, instrument_id="vox")
+    editor.apply_effect(4, "length_beats", 1.25)
+    mutation = editor.history[-1]
+
+    assert editor.step_to_beat(4) == pytest.approx(0.5)
+    start, duration = editor.mutation_preview_window(mutation)
+    assert start == pytest.approx(0.5)
+    assert duration == pytest.approx(1.25)
+
+    queue = PlaybackQueue()
+    request = editor.queue_mutation_preview(queue, mutation)
+    assert request.start_beat == pytest.approx(0.5)
+    assert request.duration_beats == pytest.approx(1.25)
+
+
+def _make_pattern(length: int = 8) -> Pattern:
+    return Pattern(
+        id="pattern",
+        name="Pattern",
+        length_steps=length,
+        steps=[PatternStep() for _ in range(length)],
+    )

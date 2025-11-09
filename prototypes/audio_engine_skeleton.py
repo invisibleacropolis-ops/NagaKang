@@ -662,10 +662,12 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
     bridge = PatternPerformanceBridge(config, tempo, sample_library={"demo": sample})
     playback = bridge.render_pattern(pattern, instrument)
     loudness = bridge.loudness_trends(playback, beats_per_bucket=1.0)
+    smoothing_rows = bridge.automation_smoothing_rows(playback)
     return {
         "duration_seconds": playback.duration_seconds,
         "beat_loudness": loudness,
         "automation_events": playback.automation_log,
+        "automation_smoothing": smoothing_rows,
     }
 
 
@@ -684,7 +686,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--export-json",
         type=Path,
-        help="Destination path for stress-test JSON summary (requires --stress-plan)",
+        help="Destination path for JSON summary (stress plans or demos)",
     )
     parser.add_argument(
         "--export-csv",
@@ -757,32 +759,40 @@ def main() -> None:
         logger.info(
             "Pattern demo automation events: %s", len(summary["automation_events"])  # type: ignore[index]
         )
-        smoothing_events = [
-            event
-            for event in summary["automation_events"]  # type: ignore[index]
-            if isinstance(event, dict) and event.get("smoothing")
-        ]
-        if smoothing_events:
+        smoothing_rows = summary.get("automation_smoothing", [])  # type: ignore[index]
+        if smoothing_rows:
             total_segments = 0
-            for event in smoothing_events:
-                smoothing = event.get("smoothing", {})
-                segments = int(smoothing.get("segments", 0))
-                total_segments += max(0, segments)
-                event_id = event.get("event_id") or (
-                    f"{event.get('module')}.{event.get('parameter')}@{float(event.get('beats', 0.0)):.2f}"
-                )
-                window_beats = float(smoothing.get("window_beats", 0.0) or 0.0)
-                state = "applied" if smoothing.get("applied") else "pending"
+            for row in smoothing_rows:
+                if not isinstance(row, dict):
+                    continue
+                event_id = str(row.get("event_id") or row.get("identifier"))
+                window_beats = float(row.get("window_beats", 0.0) or 0.0)
+                state = "applied" if row.get("applied") else "pending"
+                segment_total = int(row.get("segment_total") or row.get("segments") or 0)
+                total_segments += max(0, segment_total)
+                breakdown = row.get("segment_breakdown")
+                if isinstance(breakdown, dict) and breakdown:
+                    parts = ", ".join(f"{name}={value}" for name, value in breakdown.items())
+                else:
+                    parts = str(segment_total)
                 logger.info(
                     "Smoothing %s: %s segments over %.2f beats (%s)",
                     event_id,
-                    segments,
+                    parts,
                     window_beats,
                     state,
                 )
             logger.info(
-                "Smoothing summary: %s events, %s segments", len(smoothing_events), total_segments
+                "Smoothing summary: %s rows, %s segments", len(smoothing_rows), total_segments
             )
+        if args.export_json:
+            payload = {
+                "demo": "pattern",
+                **summary,
+            }
+            args.export_json.parent.mkdir(parents=True, exist_ok=True)
+            args.export_json.write_text(json.dumps(payload, indent=2, sort_keys=True))
+            logger.info("Wrote pattern demo summary to %s", args.export_json)
         return
     engine = AudioEngine(settings=settings)
     engine.start()
