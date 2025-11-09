@@ -1,3 +1,35 @@
+# Session Summary (Step 5 Node Graph Commands & Editor – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§5 & 9) to confirm the
+  node-builder scope and undo expectations before shipping code/docs.
+- Extended `audio.node_graph.NodeGraph` with duplication helpers and
+  definition-replacement logic so instrument designers can iterate on module
+  variants without manual rewiring. (Step 5 node builder completion: ~12% ➜ 100%)
+- Introduced undoable command objects plus `NodeGraphEditor`, unlocking future
+  Kivy bindings that can translate gestures directly into graph mutations. Added
+  regression coverage capturing duplication, replacement, and editor undo/redo
+  flows. (Step 5 regression coverage completion: ~0% ➜ 100%)
+- Documented the command suite and outlined the Kivy node-canvas binding plan in
+  `docs/step5_node_builder_kickoff.md` for external collaborators. (Step 5
+  documentation completion: ~40% ➜ 100%)
+- Ran `poetry run pytest` to validate the expanded node-graph toolkit alongside
+  the existing sequencing suites.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Effects, Routing, and Mixer Kickoff (~0% ➜ 15%)**
+   - Draft mixer channel abstractions, prototype send/return routing in code,
+     and outline the corresponding Kivy layout strategy per README §6.
+
 # Session Summary (Step 4 Preview Cache & Step 5 Node Graph Kickoff – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–5 & §9) to ground the
   preview caching work and Step 5 graph scaffolding in the musician-first
