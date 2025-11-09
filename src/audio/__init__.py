@@ -7,7 +7,14 @@ from .engine import (
     ParameterSpec,
     TempoMap,
 )
-from .mixer import MixerChannel, MixerGraph, MixerReturnBus, MixerSendConfig
+from .effects import SoftKneeCompressorInsert, ThreeBandEqInsert
+from .mixer import (
+    MixerChannel,
+    MixerGraph,
+    MixerReturnBus,
+    MixerSendConfig,
+    MixerSubgroup,
+)
 from .metrics import integrated_lufs, rms_dbfs, rms_per_channel
 from .modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
 from .tracker_bridge import PatternPerformanceBridge, PatternPlayback
@@ -23,12 +30,15 @@ __all__ = [
     "MixerGraph",
     "MixerReturnBus",
     "MixerSendConfig",
+    "MixerSubgroup",
     "AmplitudeEnvelope",
     "ClipSampler",
     "PatternPerformanceBridge",
     "PatternPlayback",
     "OnePoleLowPass",
     "SineOscillator",
+    "SoftKneeCompressorInsert",
+    "ThreeBandEqInsert",
     "integrated_lufs",
     "rms_dbfs",
     "rms_per_channel",

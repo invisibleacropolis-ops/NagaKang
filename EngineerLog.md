@@ -1,3 +1,41 @@
+# Session Summary (Step 6 Mixer Insert & Subgroup Expansion – Effects & Routing)
+- Re-read the Comprehensive Development Plan (README §§6 & 9) to verify the
+  Step 6 mixer milestones and ensure the new inserts align with the broader
+  routing strategy before editing code or docs.
+- Implemented `audio.effects.ThreeBandEqInsert` and
+  `audio.effects.SoftKneeCompressorInsert`, delivering musician-readable EQ and
+  dynamics processors that satisfy the MixerChannel insert contract. (Step 6
+  mixer architecture completion: ~18% ➜ ~26%)
+- Added `audio.mixer.MixerSubgroup`, channel ➜ subgroup assignment, and solo
+  propagation inside `MixerGraph` so rhythm sections can be balanced and scoped
+  with the console-style workflow promised in README §6. (Step 6 mixer routing
+  completion: ~18% ➜ ~32%)
+- Expanded `tests/test_audio_mixer.py` to cover the new insert processors,
+  subgroup routing, and solo logic, locking down regressions as Step 6 scales.
+  (Step 6 regression coverage completion: ~15% ➜ ~28%)
+- Documented the insert library and subgroup scaffolding in
+  `docs/step6_mixer_kickoff.md` for outside engineers. (Step 6 documentation
+  completion: ~20% ➜ ~32%)
+- Ran `poetry run pytest` to confirm the augmented audio/mixer suite alongside
+  existing regressions.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Mixer Effects & Routing Expansion (~32% ➜ 45%)**
+   - Prototype reverb/delay inserts for return buses, surface subgroup metering
+     plus nested routing, and start wiring the Kivy mixer mock to the expanded
+     API surface.
+
 # Session Summary (Step 5 Node Graph Commands & Editor – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§5 & 9) to confirm the
   node-builder scope and undo expectations before shipping code/docs.

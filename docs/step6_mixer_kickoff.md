@@ -41,8 +41,33 @@ from a stable baseline.
   - Pre-fader sends targeting a return bus with a simple gain-doubling
     effect, confirming that the block summation accounts for both the
     dry and processed contributions.
+- Expanded coverage now exercises the subgroup/solo signal path plus the
+  new insert processors, keeping Step 6 regression confidence high as we
+  add more complex routing scenarios.
 - Error handling defends against missing return buses so configuration
   bugs surface immediately in tests or during live authoring.
+
+## Insert Library Expansion
+
+- Added `audio.effects.ThreeBandEqInsert`, a stateful three-band EQ that
+  applies low-shelf, peaking mid, and high-shelf curves without breaking
+  the mixer’s insert contract.  Gains are stored in dB so outside
+  engineers can reason about tonal moves using familiar console
+  language.
+- Added `audio.effects.SoftKneeCompressorInsert`, a feed-forward dynamic
+  processor with musical attack/release coefficients, soft-knee control,
+  and optional makeup gain.  This gives channel and subgroup strips a
+  ready-made way to tame peaks before more advanced DSP modules land.
+
+## Subgroup & Solo Scaffolding
+
+- `audio.mixer.MixerSubgroup` aggregates post-fader channel output,
+  exposes its own insert slots, and mirrors fader/mute controls so
+  rhythm sections or vocal stacks can be balanced as a single unit.
+- `MixerGraph` learned subgroup registration, channel ➜ subgroup
+  assignment, and solo propagation.  When any strip or subgroup enters
+  solo, the graph constrains processing to the highlighted paths,
+  matching the workflow described in README §6.
 
 ## Kivy Mixer Layout Strategy
 
@@ -63,11 +88,10 @@ from a stable baseline.
 
 ## Next Steps
 
-1. Implement core DSP inserts (EQ, compression, reverb) that conform to
-   the insert callable contract so they can be slotted into channels and
-   return buses without extra glue code.
-2. Extend the mixer graph with subgroup buses and solo logic, aligning
-   with the README §6 routing matrix goals.
+1. Implement the spatial effects (reverb/delay) required for the first
+   auxiliary presets so return buses can demonstrate real ambience.
+2. Surface subgroup metering and nested routing to round out the Step 6
+   matrix before GUI integration.
 3. Start wiring Kivy prototypes against the new mixer primitives,
    piggy-backing on the node builder command patterns for undo/redo and
    automation hand-off.

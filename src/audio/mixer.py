@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional
+from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Set
 
 import numpy as np
 
@@ -59,6 +59,7 @@ class MixerChannel:
         fader_db: float = 0.0,
         muted: bool = False,
         sends: Iterable[MixerSendConfig] | None = None,
+        solo: bool = False,
     ) -> None:
         self.name = name
         self._source = source
@@ -68,6 +69,7 @@ class MixerChannel:
         self._fader_db = fader_db
         self._fader_gain = _db_to_linear(fader_db)
         self._muted = muted
+        self._solo = solo
         self._sends: Dict[str, MixerSendConfig] = {send.bus: send for send in sends or []}
 
     @property
@@ -95,6 +97,13 @@ class MixerChannel:
 
     def set_muted(self, muted: bool) -> None:
         self._muted = bool(muted)
+
+    @property
+    def solo(self) -> bool:
+        return self._solo
+
+    def set_solo(self, solo: bool) -> None:
+        self._solo = bool(solo)
 
     def add_insert(self, processor: InsertProcessor) -> None:
         """Append an insert processor to the channel chain."""
@@ -152,6 +161,61 @@ class MixerChannel:
         return post_fader, sends
 
 
+class MixerSubgroup:
+    """Processes collections of channels before they reach the master bus."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        config: EngineConfig,
+        inserts: Iterable[InsertProcessor] | None = None,
+        fader_db: float = 0.0,
+        muted: bool = False,
+        solo: bool = False,
+    ) -> None:
+        self.name = name
+        self._config = config
+        self._inserts = list(inserts or [])
+        self._fader_db = fader_db
+        self._fader_gain = _db_to_linear(fader_db)
+        self._muted = muted
+        self._solo = solo
+
+    def add_insert(self, processor: InsertProcessor) -> None:
+        self._inserts.append(processor)
+
+    def set_fader_db(self, value: float) -> None:
+        self._fader_db = float(value)
+        self._fader_gain = _db_to_linear(self._fader_db)
+
+    @property
+    def muted(self) -> bool:
+        return self._muted
+
+    def set_muted(self, muted: bool) -> None:
+        self._muted = bool(muted)
+
+    @property
+    def solo(self) -> bool:
+        return self._solo
+
+    def set_solo(self, solo: bool) -> None:
+        self._solo = bool(solo)
+
+    def process(self, buffer: np.ndarray) -> np.ndarray:
+        working = np.array(buffer, copy=True, dtype=np.float32)
+        for processor in self._inserts:
+            working = np.array(processor(working), copy=False)
+            if working.shape[1] != self._config.channels:
+                raise ValueError("Subgroup insert altered channel count")
+        if self._muted:
+            working.fill(0.0)
+        else:
+            working *= self._fader_gain
+        return working
+
+
 class MixerReturnBus:
     """Aggregates auxiliary sends and optionally processes the combined signal."""
 
@@ -184,6 +248,8 @@ class MixerGraph:
     def __init__(self, config: EngineConfig, *, master_fader_db: float = 0.0) -> None:
         self.config = config
         self._channels: MutableMapping[str, MixerChannel] = {}
+        self._subgroups: MutableMapping[str, MixerSubgroup] = {}
+        self._channel_groups: Dict[str, str] = {}
         self._returns: MutableMapping[str, MixerReturnBus] = {}
         self._master_fader_db = master_fader_db
         self._master_gain = _db_to_linear(master_fader_db)
@@ -193,10 +259,25 @@ class MixerGraph:
             raise ValueError(f"Channel '{channel.name}' already registered")
         self._channels[channel.name] = channel
 
+    def add_subgroup(self, subgroup: MixerSubgroup) -> None:
+        if subgroup.name in self._subgroups:
+            raise ValueError(f"Subgroup '{subgroup.name}' already registered")
+        self._subgroups[subgroup.name] = subgroup
+
     def add_return_bus(self, bus: MixerReturnBus) -> None:
         if bus.name in self._returns:
             raise ValueError(f"Return bus '{bus.name}' already registered")
         self._returns[bus.name] = bus
+
+    def assign_channel_to_group(self, channel_name: str, group_name: str) -> None:
+        if channel_name not in self._channels:
+            raise KeyError(f"Unknown channel '{channel_name}'")
+        if group_name not in self._subgroups:
+            raise KeyError(f"Unknown subgroup '{group_name}'")
+        self._channel_groups[channel_name] = group_name
+
+    def clear_channel_group(self, channel_name: str) -> None:
+        self._channel_groups.pop(channel_name, None)
 
     def set_master_fader_db(self, value: float) -> None:
         self._master_fader_db = float(value)
@@ -205,6 +286,10 @@ class MixerGraph:
     @property
     def channels(self) -> Mapping[str, MixerChannel]:  # pragma: no cover - trivial view
         return dict(self._channels)
+
+    @property
+    def subgroups(self) -> Mapping[str, MixerSubgroup]:  # pragma: no cover - trivial view
+        return dict(self._subgroups)
 
     @property
     def returns(self) -> Mapping[str, MixerReturnBus]:  # pragma: no cover - trivial view
@@ -216,16 +301,49 @@ class MixerGraph:
             name: np.zeros((frames, self.config.channels), dtype=np.float32)
             for name in self._returns
         }
+        group_sums: Dict[str, np.ndarray] = {
+            name: np.zeros((frames, self.config.channels), dtype=np.float32)
+            for name in self._subgroups
+        }
 
-        for channel in self._channels.values():
+        solo_channels: Set[str] = {
+            name for name, channel in self._channels.items() if channel.solo
+        }
+        solo_groups: Set[str] = {
+            name for name, subgroup in self._subgroups.items() if subgroup.solo
+        }
+        if solo_groups:
+            for channel_name, group_name in self._channel_groups.items():
+                if group_name in solo_groups:
+                    solo_channels.add(channel_name)
+        if solo_channels:
+            active_channels = solo_channels
+        else:
+            active_channels = set(self._channels.keys())
+
+        for name, channel in self._channels.items():
+            if name not in active_channels:
+                continue
             main, sends = channel.process(frames)
-            master += main
+            group_name = self._channel_groups.get(name)
+            if group_name is not None:
+                if group_name not in group_sums:
+                    raise KeyError(
+                        f"Channel '{name}' targets missing subgroup '{group_name}'"
+                    )
+                group_sums[group_name] += main
+            else:
+                master += main
             for bus, buffer in sends.items():
                 if bus not in send_sums:
                     raise KeyError(
-                        f"Channel '{channel.name}' targets missing return bus '{bus}'"
+                        f"Channel '{name}' targets missing return bus '{bus}'"
                     )
                 send_sums[bus] += buffer
+
+        for name, subgroup in self._subgroups.items():
+            processed = subgroup.process(group_sums[name])
+            master += processed
 
         for name, bus in self._returns.items():
             processed = bus.process(send_sums[name])
@@ -247,6 +365,7 @@ __all__ = [
     "InsertProcessor",
     "MixerChannel",
     "MixerGraph",
+    "MixerSubgroup",
     "MixerReturnBus",
     "MixerSendConfig",
 ]
