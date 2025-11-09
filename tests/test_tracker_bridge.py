@@ -639,7 +639,57 @@ def test_automation_dashboard_rows_surface_metadata():
     assert isinstance(row["event_index"], int)
     assert row["applied"] is True
     assert row["segments"] == 4
+    assert row["segment_total"] == 4
+    assert row["segment_breakdown"] == {"osc.amplitude|normalized|smooth=6ms:4": 4}
     assert row["strategy"] == "linear_ramp"
     assert row["sources"]
     assert row["mode"] == "average"
     assert row["resolved_values"]
+
+
+def test_automation_smoothing_rows_capture_multi_lane_segment_totals():
+    sample_rate = 24_000
+    config = EngineConfig(sample_rate=sample_rate, block_size=120, channels=2)
+    tempo = TempoMap(tempo_bpm=110.0)
+
+    instrument = InstrumentDefinition(
+        id="tone",
+        name="Dashboard Tone",
+        modules=[
+            InstrumentModule(
+                id="osc",
+                type="sine",
+                parameters={"amplitude": 0.25, "frequency_hz": 220.0},
+            ),
+        ],
+    )
+
+    pattern = Pattern(
+        id="automation_dashboard_collisions",
+        name="Automation Dashboard Collisions",
+        length_steps=4,
+        automation={
+            "osc.amplitude|normalized|smooth=4ms:5": [
+                AutomationPoint(position_beats=1.0, value=0.5)
+            ],
+            "osc.amplitude|percent|smooth=4ms:9": [
+                AutomationPoint(position_beats=1.0, value=60.0)
+            ],
+        },
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo)
+    playback = bridge.render_pattern(pattern, instrument)
+    rows = bridge.automation_smoothing_rows(playback)
+
+    assert rows, "Expected smoothing rows to be generated"
+    row = rows[0]
+    assert row["segment_total"] == 14
+    assert row["segment_breakdown"] == {
+        "osc.amplitude|normalized|smooth=4ms:5": 5,
+        "osc.amplitude|percent|smooth=4ms:9": 9,
+    }
+    assert set(row["sources"]) == {
+        "osc.amplitude|normalized|smooth=4ms:5",
+        "osc.amplitude|percent|smooth=4ms:9",
+    }

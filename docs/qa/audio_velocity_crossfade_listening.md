@@ -58,6 +58,21 @@ heuristics and analysed with `audio.metrics`.
   letting QA trace each render back to the queued Step 4 undo stack. Reference
   JSON snapshots live alongside the WAVs under `docs/assets/audio/vocal_stabs/`.
 
+## Choir swell layering follow-up
+
+- Rendered a long-release choir swell (72 BPM, 32 steps) to confirm the vocal
+  amplitude heuristics stay balanced when pad tails overlap. The first bucket
+  covering beats 0–2 landed at −7.1 dBFS average RMS / −8.0 LUFS while the bold
+  entrance (beats 2–4) settled at −17.7 dBFS / −18.5 LUFS, keeping the softer
+  layer within 9.5 dB of the bold swell without masking transients.【0c5c1c†L12-L18】
+- The smoothing log scheduled a nine-segment ramp (`lp.cutoff_hz|smooth=12ms:9`)
+  with event IDs `lp.cutoff_hz@0.0000#11` and `lp.cutoff_hz@4.0000#12`, giving
+  the tracker dashboard a reproducible identifier pair for undo correlation and
+  Step 4 previews.【0c5c1c†L19-L26】
+- Export the JSON payload via `poetry run python prototypes/audio_engine_skeleton.py --pattern-demo --export-json demo.json`
+  so remote collaborators can review the same LUFS deltas while the S3 mirror is
+  queued.
+
 ## Next listening pass
 
 - Mirror the gospel stab renders into the secure S3 bucket so remote

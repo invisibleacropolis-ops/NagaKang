@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Sequence
 
 import numpy as np
 
@@ -222,6 +222,24 @@ class PatternPerformanceBridge:
             metadata = event.get("lane_metadata")
             if metadata:
                 row["lane_metadata"] = metadata
+            segment_breakdown: dict[str, int] = {}
+            metadata_items: List[Mapping[str, object]] = []
+            if isinstance(metadata, Mapping):
+                metadata_items = [metadata]
+            elif isinstance(metadata, list):
+                metadata_items = [item for item in metadata if isinstance(item, Mapping)]
+            sources: Sequence[str] = ()
+            if "smoothing_sources" in event and isinstance(event["smoothing_sources"], list):
+                sources = [str(source) for source in event["smoothing_sources"]]
+            for idx, meta in enumerate(metadata_items):
+                segments_hint = self._metadata_smoothing_segments(meta)
+                if segments_hint is None:
+                    continue
+                source_name = sources[idx] if idx < len(sources) else f"lane_{idx}"
+                segment_breakdown[source_name] = segments_hint
+            if segment_breakdown:
+                row["segment_breakdown"] = segment_breakdown
+                row["segment_total"] = sum(segment_breakdown.values())
             rows.append(row)
         rows.sort(
             key=lambda item: (
@@ -643,11 +661,12 @@ class PatternPerformanceBridge:
                 else:
                     log_entry["lane_metadata"] = metadata_payloads
             source_values = [event["source_value"] for event in events]
+            source_names = [event["lane_name"] for event in events]
+            log_entry["smoothing_sources"] = source_names
             if len(source_values) == 1:
                 log_entry["source_value"] = source_values[0]
             else:
                 log_entry["source_value"] = source_values
-                log_entry["smoothing_sources"] = [event["lane_name"] for event in events]
                 log_entry["smoothed_values"] = values
                 log_entry["smoothing_mode"] = "average"
             if smoothing_info is not None:

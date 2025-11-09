@@ -17,13 +17,22 @@ future undo/redo support.
   quick groove experimentation before the playback engine lands.
 - `step_summary(index)` – surfaces lightweight info for UI previews (note,
   velocity, instrument, effects).
+- `step_to_beat(index)` / `steps_to_beats(count)` – translate tracker grid
+  indices into beat values using the configurable `steps_per_beat` resolution so
+  sequencer services can stay tempo-aware without duplicating math.
 - `undo(steps)` / `redo(steps)` – revert or replay the most recent mutations
   while exposing `undo_stack` / `redo_stack` so the UI can reflect pending
   history. Each mutation carries a stable `mutation_id` that ties into the
   automation smoothing identifiers logged by Step 3.
+- `batch(label)` – context manager that groups multiple edits into a single
+  undo/redo frame, ensuring drag gestures or chord entries roll back together.
+- `mutation_preview_window(mutation)` – returns the tempo-aware beat window a
+  preview should cover, factoring in per-step `length_beats` effects.
 - `queue_mutation_preview(queue, mutation, step_duration_beats)` – pushes a
   playback request into the new `PlaybackQueue` stub so the sequencer can render
-  previews without blocking the main tracker grid.
+  previews without blocking the main tracker grid. When duration overrides are
+  omitted the helper now derives beat timing from `mutation_preview_window()` so
+  playback stays aligned to the configured resolution.
 
 ## PlaybackQueue stub
 
@@ -42,8 +51,6 @@ future undo/redo support.
   playback scheduler.
 - Wire `PlaybackQueue` into a sequencer service that streams preview requests to
   `PatternPerformanceBridge` without blocking the tracker grid.
-- Add mutation batching so grouped edits roll back as a single undo/redo frame,
-  aligning with the workflow guidance in README §4.
 - Sketch tracker-grid interaction flows that map pointer/multi-touch gestures to
   `PatternEditor` calls, annotate which gestures enqueue playback previews vs.
   silent edits, and capture those flows in the Step 4 design notebook.

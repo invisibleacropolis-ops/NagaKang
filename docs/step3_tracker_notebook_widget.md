@@ -110,6 +110,10 @@ show_tracker_dashboard(rows, smoothing)
   zero-based `event_index`. The notebook widget shows that token directly so
   facilitators can map dashboard entries to the undo/redo stack landing in
   `tracker.PatternEditor`.
+- When multiple automation lanes collide, rows include `segment_breakdown`
+  dictionaries and a `segment_total`. The CLI demo mirrors this information,
+  printing per-lane segment counts alongside the aggregated smoothing window so
+  QA can reconcile notebook badges with tracker exports at a glance.
 
 The mock guide also includes an ASCII layout that mirrors the widget's spacing
 and margin tokens so the tracker UI team can wireframe the dashboard before the
