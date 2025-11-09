@@ -47,6 +47,20 @@ from a stable baseline.
 - Error handling defends against missing return buses so configuration
   bugs surface immediately in tests or during live authoring.
 
+## Return Bus Spatial Effects
+
+- Added `audio.effects.StereoFeedbackDelayInsert`, a feedback delay tuned
+  for send/return workflows.  It keeps per-channel state so echoes ring
+  out over multiple mixer blocks and exposes straightforward musician
+  controls (delay milliseconds, feedback, dry/wet mix).
+- Added `audio.effects.PlateReverbInsert`, a lightweight diffused delay
+  network that captures the plate-style ambience promised in README §6.
+  The insert processes pre-delay and diffusion in separate stages so
+  future GUI sliders map directly to the documented parameters.
+- Return bus processors in `audio.mixer.MixerReturnBus` now run these
+  spatial effects, letting Step 6 demonstrations showcase send/return
+  presets instead of placeholder gain-only processors.
+
 ## Insert Library Expansion
 
 - Added `audio.effects.ThreeBandEqInsert`, a stateful three-band EQ that
@@ -68,6 +82,27 @@ from a stable baseline.
   assignment, and solo propagation.  When any strip or subgroup enters
   solo, the graph constrains processing to the highlighted paths,
   matching the workflow described in README §6.
+- Nested subgroup routing lets engineers layer buses (e.g., drums →
+  band → master) while keeping inserts and fader logic intact.  Each
+  subgroup now tracks a `MeterReading` so the GUI and QA dashboards can
+  surface peak/RMS information without reprocessing buffers.
+- `MixerGraph.channel_groups` exposes the channel → subgroup mapping so
+  UI layers can reflect routing assignments, and
+  `MixerGraph.subgroup_meters` returns the latest meter snapshot for
+  display.
+
+## Kivy Mixer Mock Binding
+
+- Authored `docs/step6_mixer_kivy_mock.py`, introducing
+  `MixerBoardAdapter` and `MixerStripWidget` prototypes that translate
+  `MixerGraph` state (faders, subgroup meters, send assignments) into a
+  touch-friendly strip model.
+- The demo graph inside the mock exercises the new reverb/delay return
+  buses and nested routing so UI contributors can see the expected data
+  flow while the full Kivy implementation comes together.
+- The adapter uses the new subgroup metering API to feed peak/RMS values
+  directly into `NumericProperty` fields, establishing the pattern Kivy
+  contributors will follow for the production mixer layout.
 
 ## Kivy Mixer Layout Strategy
 
@@ -88,11 +123,11 @@ from a stable baseline.
 
 ## Next Steps
 
-1. Implement the spatial effects (reverb/delay) required for the first
-   auxiliary presets so return buses can demonstrate real ambience.
-2. Surface subgroup metering and nested routing to round out the Step 6
-   matrix before GUI integration.
-3. Start wiring Kivy prototypes against the new mixer primitives,
-   piggy-backing on the node builder command patterns for undo/redo and
-   automation hand-off.
+1. Expand mixer automation hooks so tracker envelopes can target send
+   levels and subgroup faders alongside existing channel parameters.
+2. Integrate the metering snapshots into CLI/QA diagnostics, ensuring
+   regression runs capture Step 6 routing levels without launching the
+   GUI.
+3. Flesh out the Kivy mock with drag-and-drop insert reordering and
+   return bus strips, paving the way for the full multi-touch layout.
 

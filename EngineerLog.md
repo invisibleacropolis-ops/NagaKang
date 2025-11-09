@@ -1,3 +1,42 @@
+# Session Summary (Step 6 Return FX & Nested Routing – Effects & Routing)
+- Re-read the Comprehensive Development Plan (README §§6 & 9) to confirm the
+  Step 6 mixer roadmap before expanding the return-bus and routing surface.
+- Added `audio.effects.StereoFeedbackDelayInsert` and
+  `audio.effects.PlateReverbInsert`, giving return buses stateful ambience
+  processors that musicians can dial in using the documented delay/mix
+  parameters. (Step 6 mixer architecture completion: ~26% ➜ ~38%)
+- Extended `audio.mixer.MixerGraph` with nested subgroup routing,
+  `MeterReading` snapshots, and channel ➜ subgroup accessors so console-style
+  bus stacks and metering panels align with README §6 expectations. (Step 6
+  mixer routing completion: ~32% ➜ ~46%)
+- Broadened `tests/test_audio_mixer.py` to cover the new return inserts,
+  feedback tails, nested routing, and meter exposure, ensuring the regression
+  suite exercises the expanded signal paths. (Step 6 regression coverage
+  completion: ~28% ➜ ~40%)
+- Authored `docs/step6_mixer_kivy_mock.py` and updated
+  `docs/step6_mixer_kickoff.md`/`docs/documentation_structure.md` so external
+  engineers can prototype the Kivy mixer mock directly against the richer
+  MixerGraph surface. (Step 6 documentation completion: ~32% ➜ ~45%)
+- Ran `poetry run pytest` to validate the augmented mixer/effects stack alongside
+  existing regressions.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Mixer Automation & QA Integration (~45% ➜ 58%)**
+   - Wire tracker automation envelopes into send/subgroup parameters, expose the
+     new meters via CLI diagnostics, and deepen the Kivy mock with insert
+     reordering plus return-strip affordances.
+
 # Session Summary (Step 6 Mixer Insert & Subgroup Expansion – Effects & Routing)
 - Re-read the Comprehensive Development Plan (README §§6 & 9) to verify the
   Step 6 mixer milestones and ensure the new inserts align with the broader

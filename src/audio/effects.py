@@ -237,5 +237,151 @@ class SoftKneeCompressorInsert:
         return compressed - level_db
 
 
-__all__ = ["SoftKneeCompressorInsert", "ThreeBandEqInsert"]
+@dataclass
+class StereoFeedbackDelayInsert:
+    """Stereo feedback delay tailored for return buses.
+
+    The implementation deliberately favours clarity over extreme DSP accuracy so
+    outside engineers can reason about the behaviour when wiring return bus
+    presets.  Delay time is stored in milliseconds, feedback is linear, and the
+    mix parameter blends the dry input with the delayed tail.
+    """
+
+    config: EngineConfig
+    delay_ms: float = 380.0
+    feedback: float = 0.35
+    mix: float = 0.5
+
+    def __post_init__(self) -> None:
+        self._delay_samples = max(
+            1, int(round(self.delay_ms * self.config.sample_rate / 1_000.0))
+        )
+        self._buffer = np.zeros(
+            (self._delay_samples, self.config.channels), dtype=np.float32
+        )
+        self._index = 0
+        self._feedback = float(np.clip(self.feedback, 0.0, 0.95))
+        self._mix = float(np.clip(self.mix, 0.0, 1.0))
+
+    def __call__(self, buffer: np.ndarray) -> np.ndarray:
+        if buffer.size == 0:
+            return buffer
+        working = np.array(buffer, copy=True, dtype=np.float32)
+        wet = np.zeros_like(working)
+        for frame in range(working.shape[0]):
+            delayed = self._buffer[self._index]
+            wet[frame] = delayed
+            new_sample = working[frame] + delayed * self._feedback
+            self._buffer[self._index] = new_sample
+            self._index = (self._index + 1) % self._delay_samples
+        dry_gain = 1.0 - self._mix
+        wet_gain = self._mix
+        return working * dry_gain + wet * wet_gain
+
+
+class _DiffusedDelayNetwork:
+    """Helper implementing a lightweight Schroeder-inspired reverb network."""
+
+    def __init__(
+        self,
+        config: EngineConfig,
+        delay_times_ms: Iterable[float],
+        feedback: float,
+        damping: float,
+    ) -> None:
+        sample_rate = config.sample_rate
+        self._buffers = []
+        self._indices = []
+        self._filter_state = []
+        for delay_ms in delay_times_ms:
+            length = max(1, int(round(delay_ms * sample_rate / 1_000.0)))
+            self._buffers.append(np.zeros((length, config.channels), dtype=np.float32))
+            self._indices.append(0)
+            self._filter_state.append(np.zeros(config.channels, dtype=np.float32))
+        self._feedback = float(np.clip(feedback, 0.0, 0.95))
+        self._damping = float(np.clip(damping, 0.0, 0.99))
+
+    def process(self, excitation: np.ndarray) -> np.ndarray:
+        if excitation.size == 0:
+            return excitation
+        channels = excitation.shape[1]
+        output = np.zeros_like(excitation)
+        for frame in range(excitation.shape[0]):
+            accum = np.zeros(channels, dtype=np.float32)
+            for idx, buffer in enumerate(self._buffers):
+                pointer = self._indices[idx]
+                delayed = buffer[pointer]
+                filter_state = self._filter_state[idx]
+                # Simple one-pole low-pass inside the feedback loop for damping.
+                filter_state = (
+                    (1.0 - self._damping) * delayed
+                    + self._damping * filter_state
+                )
+                self._filter_state[idx] = filter_state
+                buffer[pointer] = excitation[frame] + filter_state * self._feedback
+                self._indices[idx] = (pointer + 1) % buffer.shape[0]
+                accum += filter_state
+            output[frame] = accum / max(len(self._buffers), 1)
+        return output
+
+
+@dataclass
+class PlateReverbInsert:
+    """Return-bus reverb using a compact diffused delay network."""
+
+    config: EngineConfig
+    pre_delay_ms: float = 20.0
+    mix: float = 0.35
+    decay: float = 0.75
+    damping: float = 0.35
+
+    def __post_init__(self) -> None:
+        sample_rate = self.config.sample_rate
+        if self.pre_delay_ms > 0.0:
+            self._pre_delay_samples = max(
+                1, int(round(self.pre_delay_ms * sample_rate / 1_000.0))
+            )
+            self._pre_delay = np.zeros(
+                (self._pre_delay_samples, self.config.channels), dtype=np.float32
+            )
+            self._pre_index = 0
+        else:
+            self._pre_delay_samples = 0
+            self._pre_delay = None
+            self._pre_index = 0
+        # Delay spread chosen to stay musical for common tempos while keeping CPU
+        # light for prototypes.
+        self._network = _DiffusedDelayNetwork(
+            self.config,
+            delay_times_ms=(43.0, 57.0, 71.0, 89.0),
+            feedback=self.decay,
+            damping=self.damping,
+        )
+        self._mix = float(np.clip(self.mix, 0.0, 1.0))
+
+    def __call__(self, buffer: np.ndarray) -> np.ndarray:
+        if buffer.size == 0:
+            return buffer
+        working = np.array(buffer, copy=True, dtype=np.float32)
+        if self._pre_delay is None:
+            pre_delayed = working
+        else:
+            pre_delayed = np.zeros_like(working)
+            for frame in range(working.shape[0]):
+                delayed = self._pre_delay[self._pre_index]
+                pre_delayed[frame] = delayed
+                self._pre_delay[self._pre_index] = working[frame]
+                self._pre_index = (self._pre_index + 1) % self._pre_delay_samples
+        wet = self._network.process(pre_delayed)
+        dry_gain = 1.0 - self._mix
+        wet_gain = self._mix
+        return working * dry_gain + wet * wet_gain
+
+
+__all__ = [
+    "PlateReverbInsert",
+    "SoftKneeCompressorInsert",
+    "StereoFeedbackDelayInsert",
+    "ThreeBandEqInsert",
+]
 
