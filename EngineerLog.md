@@ -1,3 +1,40 @@
+# Session Summary (Step 4 Preview Renders & Async Draining – Musician Enablement)
+- Re-read the Comprehensive Development Plan (README §§3–4 & §9) to keep the
+  preview streaming work aligned with the musician-first playback roadmap before
+  touching code or docs.
+- Extended `tracker.PlaybackWorker` with `PreviewRender` windows, optional
+  `PatternPerformanceBridge` integration, render callbacks, and an async
+  `process_pending_async()` helper so future UI threads can drain previews
+  without stalling. (Step 4 sequencer foundations completion: ~48% ➜ ~54%)
+- Updated the tracker CLI skeleton to reuse the demo sampler bridge, surface
+  render metrics alongside request summaries, and log amplitude stats for remote
+  QA. (Step 4 documentation completion: ~95% ➜ ~97%)
+- Documented the new callback wiring and preview metrics in
+  `docs/step4_sequencer_foundations.md` so outside engineers can hook tracker
+  overlays into either request or render streams. (Step 4 documentation
+  completion: ~95% ➜ ~97%)
+- Added regression coverage for preview renders, async draining, and bridge
+  streaming to keep the playback worker prototype stable. Ran `poetry run
+  pytest` across the updated suite.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 4 Sequencer Foundations (~54% ➜ 58%)**
+   - Prototype lightweight caching for `PreviewRender` slices inside the
+     tracker notebook widget, explore background bridge reuse for batched
+     previews, and annotate the async draining flow in the Step 4 design
+     notebook.
+
 # Session Summary (Step 4 Playback Worker & Tracker CLI Preview – Musician Enablement)
 - Re-read the Comprehensive Development Plan (README §§3–4 & §9) to keep the
   playback worker prototype aligned with the musician-first sequencing goals

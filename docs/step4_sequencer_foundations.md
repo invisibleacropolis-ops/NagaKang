@@ -71,9 +71,27 @@ future undo/redo support.
   broadcasting each to registered callbacks.
 - `describe_request(request)` folds in the editor's beat/step helpers so CLI
   demos can log both beat and tracker step windows without repeating math.
-- The tracker CLI skeleton (`prototypes/audio_engine_skeleton.py`) now exposes a
-  `--tracker-preview-demo` flag that records a preview batch and single note
-  edit, logging the queued requests with beat/step spans for smoke testing.
+- When a `PatternPerformanceBridge` is supplied the worker now renders
+  `PreviewRender` windows for each `PlaybackRequest`, including peak and RMS
+  amplitudes and step-aligned frame slices for tracker overlays.
+- `process_pending_async()` mirrors the synchronous drain but executes in a
+  background thread so UI event loops can keep painting while previews stream.
+- The tracker CLI skeleton (`prototypes/audio_engine_skeleton.py`) records both
+  the request summaries and render metrics (frames, seconds, peak/rms) when
+  `--tracker-preview-demo` is enabled.
+
+### Preview callback wiring
+
+```
+MutationPreviewService → PlaybackWorker.process_pending()
+    ├─ request callbacks (CLI summaries / undo breadcrumbs)
+    └─ PatternPerformanceBridge.render_pattern()
+         └─ render callbacks (PreviewRender.to_summary → audio metrics)
+```
+
+The callback flow keeps tracker UI code simple: gesture handlers only need to
+enqueue mutations, while preview dashboards subscribe to either the request or
+render stream depending on whether they present beats, steps, or amplitude data.
 
 ## Tracker-grid gesture sketch
 

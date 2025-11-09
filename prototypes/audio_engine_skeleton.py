@@ -591,13 +591,13 @@ def render_musician_demo_patch(settings: AudioSettings, duration_seconds: float)
     }
 
 
-def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
-    """Render a tracker-style pattern through the sampler bridge and summarise loudness."""
+def _build_demo_tracker_bridge(settings: AudioSettings) -> tuple[PatternPerformanceBridge, "InstrumentDefinition"]:
+    """Return a demo PatternPerformanceBridge plus sampler instrument for tracker previews."""
 
     if np is None:
-        raise RuntimeError("NumPy is required for the pattern bridge demo render.")
+        raise RuntimeError("NumPy is required for the tracker demos.")
 
-    from domain.models import AutomationPoint, InstrumentDefinition, InstrumentModule, Pattern, PatternStep
+    from domain.models import InstrumentDefinition, InstrumentModule
 
     config = MusicianEngineConfig(
         sample_rate=settings.sample_rate,
@@ -642,14 +642,34 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
         ],
     )
 
+    bridge = PatternPerformanceBridge(config, tempo, sample_library={"demo": sample})
+    return bridge, instrument
+
+
+
+def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
+    """Render a tracker-style pattern through the sampler bridge and summarise loudness."""
+
+    if np is None:
+        raise RuntimeError("NumPy is required for the pattern bridge demo render.")
+
+    from domain.models import AutomationPoint, Pattern, PatternStep
+
+    bridge, instrument = _build_demo_tracker_bridge(settings)
+
     pattern = Pattern(
         id="demo_pattern",
         name="Demo Pattern",
         length_steps=16,
         steps=[
-            PatternStep(note=60, velocity=100, instrument_id="demo_sampler"),
+            PatternStep(note=60, velocity=100, instrument_id=instrument.id),
             PatternStep(),
-            PatternStep(note=67, velocity=112, instrument_id="demo_sampler", step_effects={"length_beats": 0.75}),
+            PatternStep(
+                note=67,
+                velocity=112,
+                instrument_id=instrument.id,
+                step_effects={"length_beats": 0.75},
+            ),
             *[PatternStep() for _ in range(13)],
         ],
         automation={
@@ -660,7 +680,6 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
         },
     )
 
-    bridge = PatternPerformanceBridge(config, tempo, sample_library={"demo": sample})
     playback = bridge.render_pattern(pattern, instrument)
     loudness = bridge.loudness_trends(playback, beats_per_bucket=1.0)
     smoothing_rows = bridge.automation_smoothing_rows(playback)
@@ -680,11 +699,15 @@ def render_pattern_bridge_demo(settings: AudioSettings) -> dict[str, object]:
         },
     }
 
-
 def run_tracker_preview_demo(settings: AudioSettings) -> dict[str, object]:
     """Exercise the tracker preview worker with MutationPreviewService."""
 
+    if np is None:
+        raise RuntimeError("NumPy is required for the tracker preview demo render.")
+
     from domain.models import Pattern, PatternStep
+
+    bridge, instrument = _build_demo_tracker_bridge(settings)
 
     pattern = Pattern(
         id="preview_pattern",
@@ -695,26 +718,36 @@ def run_tracker_preview_demo(settings: AudioSettings) -> dict[str, object]:
 
     editor = PatternEditor(pattern, steps_per_beat=6.0)
     service = MutationPreviewService(editor)
-    summaries: List[dict[str, object]] = []
-    worker = PlaybackWorker(service)
-    worker.add_callback(lambda request: summaries.append(worker.describe_request(request)))
+    request_summaries: List[dict[str, object]] = []
+    render_summaries: List[dict[str, object]] = []
+
+    worker = PlaybackWorker(
+        service,
+        bridge=bridge,
+        instruments={instrument.id: instrument},
+        default_instrument_id=instrument.id,
+    )
+    worker.add_callback(lambda request: request_summaries.append(worker.describe_request(request)))
+    worker.add_render_callback(lambda preview: render_summaries.append(preview.to_summary()))
 
     with service.preview_batch("paint chord"):
-        editor.set_step(0, note=60, velocity=100, instrument_id="demo_sampler")
+        editor.set_step(0, note=60, velocity=100, instrument_id=instrument.id)
         editor.apply_effect(0, "length_beats", 1.5)
-        editor.set_step(6, note=64, velocity=108, instrument_id="demo_sampler")
-        editor.set_step(9, note=67, velocity=112, instrument_id="demo_sampler")
+        editor.set_step(6, note=64, velocity=108, instrument_id=instrument.id)
+        editor.set_step(9, note=67, velocity=112, instrument_id=instrument.id)
 
     worker.process_pending()
 
-    editor.set_step(12, note=72, velocity=120, instrument_id="demo_sampler")
+    editor.set_step(12, note=72, velocity=120, instrument_id=instrument.id)
     service.enqueue_mutation(editor.history[-1])
     worker.process_pending()
 
     return {
         "mutations": len(editor.history),
-        "preview_requests": summaries,
+        "preview_requests": request_summaries,
+        "preview_renders": render_summaries,
         "steps_per_beat": editor.steps_per_beat,
+        "engine_sample_rate": bridge.config.sample_rate,
     }
 
 
@@ -851,10 +884,12 @@ def main() -> None:
     if args.tracker_preview_demo:
         preview = run_tracker_preview_demo(settings)
         logger.info(
-            "Tracker preview demo: %s mutations queued %s preview requests (resolution %.2f steps/beat)",
+            "Tracker preview demo: %s mutations queued %s requests and %s renders (resolution %.2f steps/beat, %s Hz)",
             preview["mutations"],
             len(preview["preview_requests"]),
+            len(preview.get("preview_renders", [])),
             preview["steps_per_beat"],
+            preview.get("engine_sample_rate", settings.sample_rate),
         )
         for request in preview["preview_requests"]:
             logger.info(
@@ -867,6 +902,15 @@ def main() -> None:
                 request["note"],
                 request["velocity"],
                 request["instrument_id"],
+            )
+        for render in preview.get("preview_renders", []):
+            logger.info(
+                "Render %s: %s frames (%.3f s) peak=%.3f rms=%.3f",
+                render.get("mutation_id"),
+                render.get("window_frames"),
+                render.get("window_seconds", 0.0),
+                render.get("peak_amplitude", 0.0),
+                render.get("rms_amplitude", 0.0),
             )
         return
     engine = AudioEngine(settings=settings)
