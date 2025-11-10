@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Mapping
+from typing import Dict, List, Mapping
 
 from audio.effects import PlateReverbInsert, StereoFeedbackDelayInsert
 from audio.engine import BaseAudioModule, EngineConfig
@@ -17,12 +17,15 @@ from audio.mixer import (
 )
 
 try:  # pragma: no cover - Kivy is optional for documentation builds
-    from kivy.properties import DictProperty, NumericProperty, StringProperty
+    from kivy.properties import BooleanProperty, DictProperty, ListProperty, NumericProperty, StringProperty
     from kivy.uix.boxlayout import BoxLayout
 except Exception:  # pragma: no cover - fallback keeps type checkers happy
     class BoxLayout:  # type: ignore
         def __init__(self, **kwargs) -> None:  # pragma: no cover - fallback
             super().__init__()
+
+    def BooleanProperty(default=False):  # type: ignore
+        return bool(default)
 
     def NumericProperty(default=0.0):  # type: ignore
         return default
@@ -32,6 +35,9 @@ except Exception:  # pragma: no cover - fallback keeps type checkers happy
 
     def DictProperty(default=None):  # type: ignore
         return {} if default is None else dict(default)
+
+    def ListProperty(default=None):  # type: ignore
+        return list(default or [])
 
 
 @dataclass
@@ -43,6 +49,8 @@ class MixerStripState:
     pan: float
     subgroup_meter: MeterReading
     sends: Mapping[str, float]
+    insert_order: List[str]
+    is_return: bool = False
 
 
 class MixerStripWidget(BoxLayout):
@@ -52,12 +60,16 @@ class MixerStripWidget(BoxLayout):
     meter_peak_db = NumericProperty(-120.0)
     meter_rms_db = NumericProperty(-120.0)
     send_levels = DictProperty({})
+    insert_order = ListProperty([])
+    is_return = BooleanProperty(False)
 
     def apply_state(self, state: MixerStripState) -> None:
         self.strip_name = state.name
         self.meter_peak_db = state.subgroup_meter.peak_db
         self.meter_rms_db = state.subgroup_meter.rms_db
         self.send_levels = dict(state.sends)
+        self.insert_order = list(state.insert_order)
+        self.is_return = bool(state.is_return)
 
 
 class MixerBoardAdapter:
@@ -78,16 +90,42 @@ class MixerBoardAdapter:
         sends: Dict[str, float] = {}
         for send in channel._sends.values():  # pragma: no cover - doc helper
             sends[send.bus] = send.level_db
+        insert_order: List[str] = []
+        for processor in getattr(channel, "_inserts", []):  # pragma: no cover - doc helper
+            label = getattr(processor, "__name__", processor.__class__.__name__)
+            insert_order.append(label or "Insert")
         return MixerStripState(
             name=channel.name,
             fader_db=channel.fader_db,
             pan=channel.pan,
             subgroup_meter=meter,
             sends=sends,
+            insert_order=insert_order,
+            is_return=False,
         )
 
     def bind_to_widget(self, widget: MixerStripWidget, channel_name: str) -> None:
         widget.apply_state(self.strip_state(channel_name))
+
+    def return_state(self, bus_name: str) -> MixerStripState:
+        bus = self._graph.returns[bus_name]
+        processor = getattr(bus, "_processor", None)
+        processor_label = "Bypass"
+        if processor is not None:
+            processor_label = getattr(processor, "__name__", processor.__class__.__name__)
+        return MixerStripState(
+            name=bus.name,
+            fader_db=getattr(bus, "level_db", 0.0),
+            pan=0.0,
+            subgroup_meter=MeterReading(-float("inf"), -float("inf")),
+            sends={},
+            insert_order=[processor_label],
+            is_return=True,
+        )
+
+    def reorder_channel_inserts(self, channel_name: str, from_index: int, to_index: int) -> None:
+        channel = self._graph.channels[channel_name]
+        channel.move_insert(from_index, to_index)
 
 
 def build_demo_graph() -> MixerGraph:

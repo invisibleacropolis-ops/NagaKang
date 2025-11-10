@@ -7,7 +7,7 @@ from audio.effects import (
     StereoFeedbackDelayInsert,
     ThreeBandEqInsert,
 )
-from audio.engine import BaseAudioModule, EngineConfig
+from audio.engine import BaseAudioModule, EngineConfig, TempoMap
 from audio.mixer import (
     MeterReading,
     MixerChannel,
@@ -16,6 +16,8 @@ from audio.mixer import (
     MixerSendConfig,
     MixerSubgroup,
 )
+from audio.tracker_bridge import PatternPerformanceBridge
+from domain.models import AutomationPoint, InstrumentDefinition, InstrumentModule, Pattern, PatternStep
 
 
 class ConstantModule(BaseAudioModule):
@@ -127,6 +129,31 @@ def test_soft_knee_compressor_reduces_dynamic_range() -> None:
     assert processed.ptp() < buffer.ptp()
 
 
+def test_channel_insert_reordering() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
+
+    def add_one(buffer: np.ndarray) -> np.ndarray:
+        return buffer + 1.0
+
+    def double(buffer: np.ndarray) -> np.ndarray:
+        return buffer * 2.0
+
+    source = ConstantModule("const", config, value=1.0)
+    channel = MixerChannel(
+        "track",
+        source=source,
+        config=config,
+        inserts=[add_one, double],
+    )
+
+    main, _ = channel.process(2)
+    np.testing.assert_allclose(main, np.full((2, 2), 4.0, dtype=np.float32))
+
+    channel.move_insert(0, 1)
+    main, _ = channel.process(2)
+    np.testing.assert_allclose(main, np.full((2, 2), 3.0, dtype=np.float32))
+
+
 def test_subgroup_routing_and_solo_logic() -> None:
     config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
     channel_a = MixerChannel(
@@ -198,3 +225,95 @@ def test_nested_subgroup_routing_and_metering() -> None:
     assert isinstance(meters["drums"], MeterReading)
     assert meters["drums"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
     assert meters["band"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
+
+
+def test_mixer_automation_updates_send_and_subgroup() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
+    channel = MixerChannel(
+        "track",
+        source=ConstantModule("src", config, value=0.5),
+        config=config,
+        sends=[MixerSendConfig(bus="fx", level_db=-60.0)],
+    )
+    subgroup = MixerSubgroup("band", config=config)
+    graph = MixerGraph(config)
+    graph.add_channel(channel)
+    graph.add_subgroup(subgroup)
+    graph.assign_channel_to_group("track", "band")
+    graph.add_return_bus(MixerReturnBus("fx"))
+
+    block_duration = config.block_size / config.sample_rate
+    graph.schedule_parameter_change(
+        "mixer:channel:track",
+        "send:fx",
+        value=-12.0,
+        time_seconds=0.0,
+        source="test",
+    )
+    graph.schedule_parameter_change(
+        "mixer:subgroup:band",
+        "fader_db",
+        value=-6.0,
+        time_seconds=block_duration,
+        source="test",
+    )
+
+    graph.process_block(config.block_size)
+    assert channel.get_send_level_db("fx") == pytest.approx(-12.0)
+    assert subgroup.fader_db == pytest.approx(0.0)
+
+    graph.process_block(config.block_size)
+    assert subgroup.fader_db == pytest.approx(-6.0)
+
+
+def test_pattern_bridge_schedules_mixer_automation() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
+    tempo = TempoMap(tempo_bpm=120.0)
+    mixer = MixerGraph(config)
+    subgroup = MixerSubgroup("band", config=config)
+    mixer.add_subgroup(subgroup)
+    mixer.add_return_bus(MixerReturnBus("plate"))
+    channel = MixerChannel(
+        "Lead",
+        source=ConstantModule("lead_src", config, value=0.4),
+        config=config,
+        sends=[MixerSendConfig(bus="plate", level_db=-24.0)],
+    )
+    mixer.add_channel(channel)
+    mixer.assign_channel_to_group("Lead", "band")
+
+    pattern = Pattern(
+        id="pat",
+        name="Pat",
+        length_steps=4,
+        steps=[PatternStep(note=60, instrument_id="inst")],
+        automation={
+            "mixer:channel:Lead.send:plate|range=-24:-6": [
+                AutomationPoint(position_beats=0.0, value=1.0)
+            ],
+            "mixer:subgroup:band.fader_db|range=-12:0": [
+                AutomationPoint(position_beats=0.0, value=0.5)
+            ],
+        },
+    )
+    instrument = InstrumentDefinition(
+        id="inst",
+        name="Instrument",
+        modules=[InstrumentModule(id="osc", type="sine")],
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, mixer=mixer)
+    bridge.render_pattern(pattern, instrument)
+
+    assert any(
+        event.module == "mixer:channel:Lead" and event.parameter == "send:plate"
+        for event in mixer.automation_events
+    )
+    assert any(
+        event.module == "mixer:subgroup:band" and event.parameter == "fader_db"
+        for event in mixer.automation_events
+    )
+
+    mixer.process_block(config.block_size)
+    assert channel.get_send_level_db("plate") == pytest.approx(-6.0)
+    assert subgroup.fader_db == pytest.approx(-6.0)
