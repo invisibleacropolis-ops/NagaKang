@@ -149,6 +149,10 @@ def _build_summary(graph: MixerGraph) -> Dict[str, object]:
         "return_levels": {
             name: bus.level_db for name, bus in graph.returns.items()
         },
+        "master_meter": {
+            "peak_db": graph.master_meter.peak_db,
+            "rms_db": graph.master_meter.rms_db,
+        },
     }
 
 
@@ -237,6 +241,11 @@ def main() -> int:
         print("\nReturn bus levels:")
         for name, level in summary["return_levels"].items():
             print(f"  - {name}: {level:.2f} dB")
+        master = summary["master_meter"]
+        print("\nMaster meter:")
+        print(
+            f"  - Peak: {master['peak_db']:.2f} dBFS | RMS: {master['rms_db']:.2f} dBFS"
+        )
     return 0
 
 

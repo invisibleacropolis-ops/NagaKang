@@ -128,6 +128,8 @@ from a stable baseline.
   :class:`audio.mixer.MixerGraph`.  Normalised curves and `|range=`
   overrides map cleanly onto send levels, subgroup faders, and mute
   toggles so tracker envelopes can drive real routing gestures.
+- Added `mixer:return:*` automation endpoints so tracker envelopes can
+  ride return-bus levels during breakdowns without bespoke macros.
 - :class:`audio.tracker_bridge.PatternPerformanceBridge` now pipes pattern
   renders through :class:`audio.mixer.MixerGraph` whenever instruments
   declare a ``mixer_channel`` macro.  Mixer automation replays inside the
@@ -137,11 +139,15 @@ from a stable baseline.
   events on block boundaries and logging them for downstream tooling. The
   tracker bridge resets the graph between renders and logs the mixer
   events alongside instrument automation for audit trails.
+- Mixer snapshots now include the master bus meter so QA dashboards can
+  pair subgroup levels with the final mix headroom.
 - New CLI: ``poetry run python tools/mixer_diagnostics.py`` renders the
   demo graph, prints subgroup meters, return levels, and the scheduled
   automation events (``--json``/``--pretty`` available for QA exports).
 - Diagnostics CLI learned ``--output`` for CI runs so automation/meter
   snapshots land in JSON artifacts without extra scripting.
+- CLI summary now includes master-peak/RMS telemetry to surface headroom
+  trends during regression runs.
 
 ## Kivy Mock Enhancements
 
@@ -156,14 +162,15 @@ from a stable baseline.
 - Adapter now exposes ``update_channel_meter`` and ``bind_return_to_widget``
   so docs can demonstrate live meter polling alongside return-strip
   level controls.
+- Adapter exposes ``set_return_level`` and ``master_meter`` helpers to
+  mirror the new automation hooks in mock UIs.
 
 ## Next Steps
 
-1. Expand mixer automation hooks so tracker envelopes can target send
-   levels and subgroup faders alongside existing channel parameters.
-2. Integrate the metering snapshots into CLI/QA diagnostics, ensuring
-   regression runs capture Step 6 routing levels without launching the
-   GUI.
-3. Flesh out the Kivy mock with drag-and-drop insert reordering and
-   return bus strips, paving the way for the full multi-touch layout.
+1. Surface per-channel post-fader meters so automation exports can
+   compare subgroup vs. strip dynamics ahead of the Kivy build.
+2. Teach the diagnostics CLI to diff successive meter captures, paving
+   the way for QA trend reports without spreadsheets.
+3. Prototype a lightweight return-bus solo workflow (docs + stubs) so
+   automation rehearsals can audition reverb tails in isolation.
 

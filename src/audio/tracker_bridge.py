@@ -71,6 +71,7 @@ class MixerPlaybackSnapshot:
     subgroup_meters: Dict[str, MeterReading]
     automation_events: List[AutomationEvent]
     return_levels: Dict[str, float]
+    master_meter: MeterReading
 
 
 class PatternPerformanceBridge:
@@ -914,6 +915,18 @@ class PatternPerformanceBridge:
                     description="Subgroup mute toggle (0 = off, 1 = on).",
                     musical_context="mix",
                 )
+        elif scope == "return":
+            if parameter == "level_db":
+                return ParameterSpec(
+                    name="level_db",
+                    display_name=f"Return {name} Level",
+                    default=0.0,
+                    minimum=-60.0,
+                    maximum=12.0,
+                    unit="dB",
+                    description="Return bus level in decibels.",
+                    musical_context="mix",
+                )
         return None
 
     def _resolve_mixer_channels(self, instrument: InstrumentDefinition) -> List[str]:
@@ -983,6 +996,7 @@ class PatternPerformanceBridge:
             subgroup_meters=dict(self._mixer.subgroup_meters),
             automation_events=list(self._mixer.automation_events),
             return_levels={name: bus.level_db for name, bus in self._mixer.returns.items()},
+            master_meter=self._mixer.master_meter,
         )
 
     def _schedule_mixer_change(
@@ -1033,6 +1047,12 @@ class PatternPerformanceBridge:
                 return subgroup.fader_db
             if parameter == "mute":
                 return 1.0 if subgroup.muted else 0.0
+        elif scope == "return":
+            bus = self._mixer.returns.get(name)
+            if bus is None:
+                return None
+            if parameter == "level_db":
+                return bus.level_db
         return None
 
     def _automation_value_mapper(
