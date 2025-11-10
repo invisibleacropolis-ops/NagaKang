@@ -90,6 +90,10 @@ class MixerChannel:
         self._muted = muted
         self._solo = solo
         self._sends: Dict[str, MixerSendConfig] = {send.bus: send for send in sends or []}
+        self._last_post_fader_meter = MeterReading(
+            peak_db=-float("inf"),
+            rms_db=-float("inf"),
+        )
 
     @property
     def source(self) -> BaseAudioModule:
@@ -140,6 +144,14 @@ class MixerChannel:
 
         self._inserts.append(processor)
 
+    def reset_post_fader_meter(self) -> None:
+        """Reset the cached post-fader meter to negative infinity."""
+
+        self._last_post_fader_meter = MeterReading(
+            peak_db=-float("inf"),
+            rms_db=-float("inf"),
+        )
+
     def move_insert(self, from_index: int, to_index: int) -> None:
         """Reorder inserts to support drag-and-drop style UI gestures."""
 
@@ -176,6 +188,12 @@ class MixerChannel:
 
         self._sends.pop(bus, None)
 
+    @property
+    def post_fader_meter(self) -> MeterReading:
+        """Return the last post-fader meter reading for the channel."""
+
+        return self._last_post_fader_meter
+
     def _apply_pan(self, buffer: np.ndarray) -> np.ndarray:
         if self._pan == 0.0 or buffer.shape[1] < 2:
             return buffer
@@ -206,6 +224,13 @@ class MixerChannel:
         pre_fader = block
         post_pan = self._apply_pan(pre_fader)
         post_fader = post_pan * (0.0 if self._muted else self._fader_gain)
+
+        peak = float(np.max(np.abs(post_fader))) if post_fader.size else 0.0
+        rms = float(np.sqrt(np.mean(np.square(post_fader)))) if post_fader.size else 0.0
+        self._last_post_fader_meter = MeterReading(
+            peak_db=_linear_to_db(peak),
+            rms_db=_linear_to_db(rms),
+        )
 
         sends: Dict[str, np.ndarray] = {}
         for bus, config in self._sends.items():
@@ -335,6 +360,7 @@ class MixerGraph:
         self._master_fader_db = master_fader_db
         self._master_gain = _db_to_linear(master_fader_db)
         self._last_subgroup_meters: Dict[str, MeterReading] = {}
+        self._last_channel_post_meters: Dict[str, MeterReading] = {}
         self._last_master_meter = MeterReading(peak_db=-float("inf"), rms_db=-float("inf"))
         self._timeline = AutomationTimeline()
         self._processed_frames = 0
@@ -402,6 +428,12 @@ class MixerGraph:
         return dict(self._last_subgroup_meters)
 
     @property
+    def channel_post_meters(self) -> Mapping[str, MeterReading]:
+        """Return the most recent post-fader channel meters."""
+
+        return dict(self._last_channel_post_meters)
+
+    @property
     def master_meter(self) -> MeterReading:
         """Return the most recent master bus meter reading."""
 
@@ -460,6 +492,10 @@ class MixerGraph:
             name: np.zeros((frames, self.config.channels), dtype=np.float32)
             for name in self._subgroups
         }
+        channel_meters: Dict[str, MeterReading] = {
+            name: MeterReading(peak_db=-float("inf"), rms_db=-float("inf"))
+            for name in self._channels
+        }
 
         solo_channels: Set[str] = {
             name for name, channel in self._channels.items() if channel.solo
@@ -481,9 +517,12 @@ class MixerGraph:
             active_channels = set(self._channels.keys())
 
         for name, channel in self._channels.items():
+            channel.reset_post_fader_meter()
             if name not in active_channels:
+                channel_meters[name] = channel.post_fader_meter
                 continue
             main, sends = channel.process(frames)
+            channel_meters[name] = channel.post_fader_meter
             group_name = self._channel_groups.get(name)
             if group_name is not None:
                 if group_name not in group_sums:
@@ -523,6 +562,7 @@ class MixerGraph:
         )
 
         self._last_subgroup_meters = meters
+        self._last_channel_post_meters = channel_meters
         self._processed_frames += frames
         return master * self._master_gain
 

@@ -41,6 +41,11 @@ def test_channel_pan_and_fader_controls() -> None:
     assert sends == {}
     np.testing.assert_allclose(main[:, 0], np.full(4, 0.5 * 10 ** (-6 / 20), dtype=np.float32))
     np.testing.assert_allclose(main[:, 1], np.zeros(4, dtype=np.float32))
+    meter = channel.post_fader_meter
+    expected_peak = 0.5 * 10 ** (-6 / 20)
+    expected_rms = np.sqrt(np.mean(np.square(np.column_stack([main[:, 0], main[:, 1]]))))
+    assert meter.peak_db == pytest.approx(20.0 * np.log10(expected_peak), abs=0.5)
+    assert meter.rms_db == pytest.approx(20.0 * np.log10(expected_rms), abs=0.5)
 
 
 def test_send_routes_audio_to_return_bus() -> None:
@@ -225,6 +230,10 @@ def test_nested_subgroup_routing_and_metering() -> None:
     assert isinstance(meters["drums"], MeterReading)
     assert meters["drums"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
     assert meters["band"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
+    channel_meters = mixer.channel_post_meters
+    assert set(channel_meters) == {"kick", "snare"}
+    assert channel_meters["kick"].peak_db == pytest.approx(20.0 * np.log10(0.5), abs=0.5)
+    assert channel_meters["snare"].peak_db == pytest.approx(20.0 * np.log10(0.25), abs=0.5)
 
 
 def test_mixer_automation_updates_send_subgroup_and_return() -> None:
@@ -370,4 +379,5 @@ def test_pattern_bridge_renders_audio_through_mixer_channel() -> None:
     assert isinstance(restored_source, ConstantModule)
     assert playback.mixer_snapshot is not None
     assert "Lead" not in playback.mixer_snapshot.subgroup_meters  # channel bypasses subgroup
+    assert "Lead" in playback.mixer_snapshot.channel_post_meters
     assert playback.mixer_snapshot.master_meter.peak_db <= 0.0

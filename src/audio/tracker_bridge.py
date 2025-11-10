@@ -69,6 +69,7 @@ class MixerPlaybackSnapshot:
     """Snapshot of mixer state captured during :class:`PatternPlayback`."""
 
     subgroup_meters: Dict[str, MeterReading]
+    channel_post_meters: Dict[str, MeterReading]
     automation_events: List[AutomationEvent]
     return_levels: Dict[str, float]
     master_meter: MeterReading
@@ -994,6 +995,7 @@ class PatternPerformanceBridge:
             return None
         return MixerPlaybackSnapshot(
             subgroup_meters=dict(self._mixer.subgroup_meters),
+            channel_post_meters=dict(self._mixer.channel_post_meters),
             automation_events=list(self._mixer.automation_events),
             return_levels={name: bus.level_db for name, bus in self._mixer.returns.items()},
             master_meter=self._mixer.master_meter,

@@ -12,7 +12,8 @@ import argparse
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Mapping
+import math
+from typing import Dict, List, Mapping, MutableMapping, Sequence
 
 import numpy as np
 
@@ -144,6 +145,7 @@ def _automation_snapshot(events: List) -> List[Dict[str, object]]:
 def _build_summary(graph: MixerGraph) -> Dict[str, object]:
     return {
         "channel_groups": dict(graph.channel_groups),
+        "channel_post_meters": _meters_snapshot(graph.channel_post_meters),
         "subgroup_meters": _meters_snapshot(graph.subgroup_meters),
         "automation_events": _automation_snapshot(graph.automation_events),
         "return_levels": {
@@ -156,7 +158,112 @@ def _build_summary(graph: MixerGraph) -> Dict[str, object]:
     }
 
 
-def parse_args() -> argparse.Namespace:
+def _delta_db(current: float, previous: float) -> float | None:
+    """Return a delta in decibels when both operands are finite."""
+
+    if not math.isfinite(current) or not math.isfinite(previous):
+        return None
+    return current - previous
+
+
+def _diff_meters(
+    previous: Mapping[str, Mapping[str, float]],
+    current: Mapping[str, Mapping[str, float]],
+) -> Dict[str, Mapping[str, float | None | str]]:
+    diff: Dict[str, Dict[str, float | None | str]] = {}
+    names = sorted(set(previous) | set(current))
+    for name in names:
+        if name not in previous:
+            meter = current[name]
+            diff[name] = {
+                "status": "added",
+                "peak_db": meter.get("peak_db"),
+                "rms_db": meter.get("rms_db"),
+            }
+            continue
+        if name not in current:
+            meter = previous[name]
+            diff[name] = {
+                "status": "removed",
+                "peak_db": meter.get("peak_db"),
+                "rms_db": meter.get("rms_db"),
+            }
+            continue
+        previous_meter = previous[name]
+        current_meter = current[name]
+        diff[name] = {
+            "peak_delta_db": _delta_db(current_meter.get("peak_db", float("nan")), previous_meter.get("peak_db", float("nan"))),
+            "rms_delta_db": _delta_db(current_meter.get("rms_db", float("nan")), previous_meter.get("rms_db", float("nan"))),
+        }
+    return diff
+
+
+def _diff_levels(
+    previous: Mapping[str, float],
+    current: Mapping[str, float],
+) -> Dict[str, Mapping[str, float | str]]:
+    diff: Dict[str, Dict[str, float | str]] = {}
+    names = sorted(set(previous) | set(current))
+    for name in names:
+        if name not in previous:
+            diff[name] = {"status": "added", "level_db": current[name]}
+            continue
+        if name not in current:
+            diff[name] = {"status": "removed", "level_db": previous[name]}
+            continue
+        diff[name] = {
+            "delta_db": _delta_db(current[name], previous[name]),
+            "previous_db": previous[name],
+            "current_db": current[name],
+        }
+    return diff
+
+
+def _diff_channel_assignments(
+    previous: Mapping[str, str], current: Mapping[str, str]
+) -> Dict[str, str]:
+    changes: Dict[str, str] = {}
+    names = sorted(set(previous) | set(current))
+    for name in names:
+        before = previous.get(name)
+        after = current.get(name)
+        if before == after:
+            continue
+        if before is None:
+            changes[name] = f"added → {after}"
+        elif after is None:
+            changes[name] = "removed"
+        else:
+            changes[name] = f"{before} → {after}"
+    return changes
+
+
+def _build_diff(
+    previous: Mapping[str, object],
+    current: Mapping[str, object],
+) -> Dict[str, object]:
+    return {
+        "channel_groups": _diff_channel_assignments(
+            previous.get("channel_groups", {}), current.get("channel_groups", {})
+        ),
+        "channel_post_meters": _diff_meters(
+            previous.get("channel_post_meters", {}),
+            current.get("channel_post_meters", {}),
+        ),
+        "subgroup_meters": _diff_meters(
+            previous.get("subgroup_meters", {}), current.get("subgroup_meters", {})
+        ),
+        "return_levels": _diff_levels(
+            previous.get("return_levels", {}), current.get("return_levels", {})
+        ),
+        "master_meter": _diff_meters(
+            {"master": previous.get("master_meter", {})},
+            {"master": current.get("master_meter", {})},
+        ).get("master", {}),
+    }
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--duration",
@@ -191,7 +298,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Write the diagnostics summary to the given file as JSON.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--compare",
+        type=Path,
+        default=None,
+        help="Compare the generated summary against a previous JSON snapshot.",
+    )
+    return parser.parse_args(argv)
 
 
 def main() -> int:
@@ -203,6 +316,11 @@ def main() -> int:
         _schedule_demo_automation(graph, duration)
     _render_graph(graph, duration, args.blocks)
     summary = _build_summary(graph)
+    diff: MutableMapping[str, object] | None = None
+    if args.compare is not None and args.compare.exists():
+        baseline = json.loads(args.compare.read_text())
+        diff = _build_diff(baseline, summary)
+        summary["diff"] = diff
 
     if args.output is not None:
         args.json = True
@@ -219,11 +337,50 @@ def main() -> int:
         print("Channel ➜ Subgroup assignments:")
         for channel, subgroup in summary["channel_groups"].items():
             print(f"  - {channel} → {subgroup}")
+        if diff and diff.get("channel_groups"):
+            print("  (Changes vs. baseline)")
+            for channel, change in diff["channel_groups"].items():
+                print(f"    · {channel}: {change}")
         print("\nSubgroup meters (peak / RMS):")
         for name, meter in summary["subgroup_meters"].items():
             peak = meter["peak_db"]
             rms = meter["rms_db"]
             print(f"  - {name}: {peak:.2f} dBFS / {rms:.2f} dBFS")
+        if diff and diff.get("subgroup_meters"):
+            print("  (Δ vs. baseline)")
+            for name, changes in diff["subgroup_meters"].items():
+                peak_delta = changes.get("peak_delta_db")
+                rms_delta = changes.get("rms_delta_db")
+                if peak_delta is None and rms_delta is None:
+                    continue
+                print(
+                    "    · {name}: Δpeak={peak} dB | Δrms={rms} dB".format(
+                        name=name,
+                        peak=f"{peak_delta:.2f}" if peak_delta is not None else "--",
+                        rms=f"{rms_delta:.2f}" if rms_delta is not None else "--",
+                    )
+                )
+        print("\nChannel post-fader meters (peak / RMS):")
+        for name, meter in summary["channel_post_meters"].items():
+            peak = meter["peak_db"]
+            rms = meter["rms_db"]
+            print(f"  - {name}: {peak:.2f} dBFS / {rms:.2f} dBFS")
+        if diff and diff.get("channel_post_meters"):
+            print("  (Δ vs. baseline)")
+            for name, changes in diff["channel_post_meters"].items():
+                status = changes.get("status")
+                if status:
+                    print(f"    · {name}: {status}")
+                    continue
+                peak_delta = changes.get("peak_delta_db")
+                rms_delta = changes.get("rms_delta_db")
+                print(
+                    "    · {name}: Δpeak={peak} dB | Δrms={rms} dB".format(
+                        name=name,
+                        peak=f"{peak_delta:.2f}" if peak_delta is not None else "--",
+                        rms=f"{rms_delta:.2f}" if rms_delta is not None else "--",
+                    )
+                )
         if summary["automation_events"]:
             print("\nScheduled automation events:")
             for event in summary["automation_events"]:
@@ -241,11 +398,38 @@ def main() -> int:
         print("\nReturn bus levels:")
         for name, level in summary["return_levels"].items():
             print(f"  - {name}: {level:.2f} dB")
+        if diff and diff.get("return_levels"):
+            print("  (Δ vs. baseline)")
+            for name, changes in diff["return_levels"].items():
+                status = changes.get("status")
+                if status:
+                    level = changes.get("level_db")
+                    suffix = f" ({level:.2f} dB)" if isinstance(level, (int, float)) else ""
+                    print(f"    · {name}: {status}{suffix}")
+                    continue
+                delta = changes.get("delta_db")
+                prev_level = changes.get("previous_db")
+                curr_level = changes.get("current_db")
+                print(
+                    f"    · {name}: {prev_level:.2f} dB → {curr_level:.2f} dB"
+                    + (f" (Δ {delta:.2f} dB)" if delta is not None else "")
+                )
         master = summary["master_meter"]
         print("\nMaster meter:")
         print(
             f"  - Peak: {master['peak_db']:.2f} dBFS | RMS: {master['rms_db']:.2f} dBFS"
         )
+        if diff and isinstance(diff.get("master_meter"), dict):
+            changes = diff["master_meter"]
+            peak_delta = changes.get("peak_delta_db")
+            rms_delta = changes.get("rms_delta_db")
+            if peak_delta is not None or rms_delta is not None:
+                print(
+                    "    Δpeak={peak} dB | Δrms={rms} dB".format(
+                        peak=f"{peak_delta:.2f}" if peak_delta is not None else "--",
+                        rms=f"{rms_delta:.2f}" if rms_delta is not None else "--",
+                    )
+                )
     return 0
 
 

@@ -47,7 +47,8 @@ class MixerStripState:
     name: str
     fader_db: float
     pan: float
-    subgroup_meter: MeterReading
+    post_fader_meter: MeterReading
+    subgroup_meter: MeterReading | None
     sends: Mapping[str, float]
     insert_order: List[str]
     is_return: bool = False
@@ -60,6 +61,8 @@ class MixerStripWidget(BoxLayout):
     strip_name = StringProperty("--")
     meter_peak_db = NumericProperty(-120.0)
     meter_rms_db = NumericProperty(-120.0)
+    subgroup_peak_db = NumericProperty(-120.0)
+    subgroup_rms_db = NumericProperty(-120.0)
     send_levels = DictProperty({})
     insert_order = ListProperty([])
     is_return = BooleanProperty(False)
@@ -67,18 +70,29 @@ class MixerStripWidget(BoxLayout):
 
     def apply_state(self, state: MixerStripState) -> None:
         self.strip_name = state.name
-        self.meter_peak_db = state.subgroup_meter.peak_db
-        self.meter_rms_db = state.subgroup_meter.rms_db
+        self.meter_peak_db = state.post_fader_meter.peak_db
+        self.meter_rms_db = state.post_fader_meter.rms_db
+        subgroup_meter = state.subgroup_meter or MeterReading(-float("inf"), -float("inf"))
+        self.subgroup_peak_db = subgroup_meter.peak_db
+        self.subgroup_rms_db = subgroup_meter.rms_db
         self.send_levels = dict(state.sends)
         self.insert_order = list(state.insert_order)
         self.is_return = bool(state.is_return)
         self.return_level_db = float(state.return_level_db or 0.0)
 
-    def update_meter(self, meter: MeterReading) -> None:
-        """Refresh meter properties without reapplying the full strip state."""
+    def update_post_meter(self, meter: MeterReading) -> None:
+        """Refresh the post-fader meter without reapplying the full strip state."""
 
         self.meter_peak_db = meter.peak_db
         self.meter_rms_db = meter.rms_db
+
+    def update_subgroup_meter(self, meter: MeterReading | None) -> None:
+        """Refresh subgroup metering for bus-aligned strip summaries."""
+
+        if meter is None:
+            meter = MeterReading(-float("inf"), -float("inf"))
+        self.subgroup_peak_db = meter.peak_db
+        self.subgroup_rms_db = meter.rms_db
 
 
 class MixerBoardAdapter:
@@ -90,12 +104,11 @@ class MixerBoardAdapter:
     def strip_state(self, channel_name: str) -> MixerStripState:
         channel = self._graph.channels[channel_name]
         subgroup_name = self._graph.channel_groups.get(channel_name)
+        subgroup_meter = None
         if subgroup_name is not None:
-            meter = self._graph.subgroup_meters.get(
+            subgroup_meter = self._graph.subgroup_meters.get(
                 subgroup_name, MeterReading(-float("inf"), -float("inf"))
             )
-        else:
-            meter = MeterReading(-float("inf"), -float("inf"))
         sends: Dict[str, float] = {}
         for send in channel._sends.values():  # pragma: no cover - doc helper
             sends[send.bus] = send.level_db
@@ -107,7 +120,10 @@ class MixerBoardAdapter:
             name=channel.name,
             fader_db=channel.fader_db,
             pan=channel.pan,
-            subgroup_meter=meter,
+            post_fader_meter=self._graph.channel_post_meters.get(
+                channel_name, MeterReading(-float("inf"), -float("inf"))
+            ),
+            subgroup_meter=subgroup_meter,
             sends=sends,
             insert_order=insert_order,
             is_return=False,
@@ -129,7 +145,8 @@ class MixerBoardAdapter:
             name=bus.name,
             fader_db=getattr(bus, "level_db", 0.0),
             pan=0.0,
-            subgroup_meter=MeterReading(-float("inf"), -float("inf")),
+            post_fader_meter=MeterReading(-float("inf"), -float("inf")),
+            subgroup_meter=None,
             sends={},
             insert_order=[processor_label],
             is_return=True,
@@ -150,10 +167,15 @@ class MixerBoardAdapter:
         """Push the latest subgroup meter into a bound widget."""
 
         subgroup_name = self._graph.channel_groups.get(channel_name)
-        meter = MeterReading(-float("inf"), -float("inf"))
+        meter = None
         if subgroup_name is not None:
-            meter = self._graph.subgroup_meters.get(subgroup_name, meter)
-        widget.update_meter(meter)
+            meter = self._graph.subgroup_meters.get(subgroup_name)
+        widget.update_post_meter(
+            self._graph.channel_post_meters.get(
+                channel_name, MeterReading(-float("inf"), -float("inf"))
+            )
+        )
+        widget.update_subgroup_meter(meter)
 
     def master_meter(self) -> MeterReading:
         """Expose the latest master bus meter for dashboard widgets."""

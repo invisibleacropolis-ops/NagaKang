@@ -165,12 +165,33 @@ from a stable baseline.
 - Adapter exposes ``set_return_level`` and ``master_meter`` helpers to
   mirror the new automation hooks in mock UIs.
 
+## QA Trend Exports & Return-Solo Workflow
+
+- `audio.mixer.MixerChannel` now tracks post-fader meters and
+  `MixerGraph.channel_post_meters` surfaces the latest readings for each
+  strip.  Pattern previews include the post-fader data inside
+  `MixerPlaybackSnapshot` so tracker exports can compare individual strip
+  dynamics against subgroup and master headroom.
+- `tools/mixer_diagnostics.py` gained a `--compare` flag plus JSON diff
+  helpers.  QA can point the CLI at a previous capture and immediately
+  read the per-strip/subgroup deltas in both JSON and human-readable
+  form, removing spreadsheet work when auditing automation sweeps.
+- Return-bus rehearsal flow: when auditioning ambience automation,
+  freeze channel faders, solo the desired return via the existing send
+  level automation helpers, and capture successive CLI snapshots with
+  ``--compare``.  The diff highlights return-level changes alongside
+  channel post meters so automation rehearsals can focus on how reverb
+  tails evolve without losing sight of dry headroom.  Documented in
+  ``docs/step6_mixer_kivy_mock.py`` via new widget properties for post-
+  fader and subgroup meters, giving UI contributors a reference layout
+  for the rehearsal view.
+
 ## Next Steps
 
-1. Surface per-channel post-fader meters so automation exports can
-   compare subgroup vs. strip dynamics ahead of the Kivy build.
-2. Teach the diagnostics CLI to diff successive meter captures, paving
-   the way for QA trend reports without spreadsheets.
-3. Prototype a lightweight return-bus solo workflow (docs + stubs) so
-   automation rehearsals can audition reverb tails in isolation.
+1. Thread the new meter deltas into the CI QA harness so nightly runs
+   surface mixer regressions automatically.
+2. Extend the Kivy mock to chart per-strip peak history using the post-
+   fader meter snapshots for real-time visualisation.
+3. Wire the tracker notebook exports to persist the diff metadata so
+   rehearsal notes can link directly to automation trend evidence.
 
