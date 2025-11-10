@@ -1,3 +1,37 @@
+# Session Summary (Step 6 Mixer Return Automation & Master Metering – Effects & Routing)
+- Re-read README §§6 & 9 to validate the return-level automation goals and QA
+  telemetry expectations before extending the mixer stack.
+- Extended `audio.mixer.MixerGraph` with master-bus metering and return-bus
+  automation so tracker envelopes can ride send tails while QA captures headroom
+  snapshots. (Step 6 mixer automation completion: ~78% ➜ ~88%)
+- Updated `audio.tracker_bridge.PatternPerformanceBridge` to surface
+  `mixer:return:*` parameter specs plus master-meter snapshots for preview
+  payloads. (Step 6 mixer automation coverage completion: ~62% ➜ ~74%)
+- Enhanced `tools/mixer_diagnostics.py` and `docs/step6_mixer_kivy_mock.py` with
+  master-meter reporting, return-level helpers, and doc-first affordances for UI
+  contributors. (Step 6 documentation completion: ~68% ➜ ~76%)
+- Expanded `tests/test_audio_mixer.py` to verify return automation, mixer
+  snapshots, and master-bus telemetry. (Step 6 regression coverage completion:
+  ~62% ➜ ~70%)
+- Ran `poetry run pytest` to exercise the mixer, tracker bridge, and automation
+  suites.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Mixer QA Trend Exports (~88% ➜ 92%)**
+   - Surface post-fader strip meters, prototype CLI diffing of successive mixer
+     snapshots, and outline a return-solo rehearsal flow for automation audits.
+
 # Session Summary (Step 6 Mixer Preview Routing & Diagnostics – Effects & Routing)
 - Re-read README §§6 & 9 to confirm the preview/meter deliverables before wiring
   the tracker bridge into the mixer pipeline.

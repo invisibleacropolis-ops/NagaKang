@@ -335,6 +335,7 @@ class MixerGraph:
         self._master_fader_db = master_fader_db
         self._master_gain = _db_to_linear(master_fader_db)
         self._last_subgroup_meters: Dict[str, MeterReading] = {}
+        self._last_master_meter = MeterReading(peak_db=-float("inf"), rms_db=-float("inf"))
         self._timeline = AutomationTimeline()
         self._processed_frames = 0
         self._automation_events: List[AutomationEvent] = []
@@ -399,6 +400,12 @@ class MixerGraph:
     @property
     def subgroup_meters(self) -> Mapping[str, MeterReading]:
         return dict(self._last_subgroup_meters)
+
+    @property
+    def master_meter(self) -> MeterReading:
+        """Return the most recent master bus meter reading."""
+
+        return self._last_master_meter
 
     @property
     def automation_events(self) -> List[AutomationEvent]:  # pragma: no cover - view helper
@@ -508,6 +515,13 @@ class MixerGraph:
             processed = bus.process(send_sums[name])
             master += processed
 
+        peak = float(np.max(np.abs(master))) if master.size else 0.0
+        rms = float(np.sqrt(np.mean(np.square(master)))) if master.size else 0.0
+        self._last_master_meter = MeterReading(
+            peak_db=_linear_to_db(peak),
+            rms_db=_linear_to_db(rms),
+        )
+
         self._last_subgroup_meters = meters
         self._processed_frames += frames
         return master * self._master_gain
@@ -589,6 +603,13 @@ class MixerGraph:
                 subgroup.set_fader_db(float(value))
             elif event.parameter == "mute":
                 subgroup.set_muted(bool(value and float(value) >= 0.5))
+        elif scope == "return":
+            bus = self._returns.get(target)
+            if bus is None:
+                return
+            if event.parameter == "level_db":
+                level = -float("inf") if value is None else float(value)
+                bus.set_level_db(level)
 
 
 __all__ = [

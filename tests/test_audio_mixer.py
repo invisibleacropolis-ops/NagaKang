@@ -227,7 +227,7 @@ def test_nested_subgroup_routing_and_metering() -> None:
     assert meters["band"].peak_db == pytest.approx(expected_peak_db, abs=0.5)
 
 
-def test_mixer_automation_updates_send_and_subgroup() -> None:
+def test_mixer_automation_updates_send_subgroup_and_return() -> None:
     config = EngineConfig(sample_rate=48_000, block_size=8, channels=2)
     channel = MixerChannel(
         "track",
@@ -257,10 +257,20 @@ def test_mixer_automation_updates_send_and_subgroup() -> None:
         time_seconds=block_duration,
         source="test",
     )
+    graph.schedule_parameter_change(
+        "mixer:return:fx",
+        "level_db",
+        value=-3.0,
+        time_seconds=0.0,
+        source="test",
+    )
 
     graph.process_block(config.block_size)
     assert channel.get_send_level_db("fx") == pytest.approx(-12.0)
     assert subgroup.fader_db == pytest.approx(0.0)
+    assert graph.returns["fx"].level_db == pytest.approx(-3.0)
+    assert isinstance(graph.master_meter, MeterReading)
+    assert graph.master_meter.peak_db > -120.0
 
     graph.process_block(config.block_size)
     assert subgroup.fader_db == pytest.approx(-6.0)
@@ -294,6 +304,9 @@ def test_pattern_bridge_schedules_mixer_automation() -> None:
             "mixer:subgroup:band.fader_db|range=-12:0": [
                 AutomationPoint(position_beats=0.0, value=0.5)
             ],
+            "mixer:return:plate.level_db|range=-18:-6": [
+                AutomationPoint(position_beats=0.0, value=1.0)
+            ],
         },
     )
     instrument = InstrumentDefinition(
@@ -314,10 +327,15 @@ def test_pattern_bridge_schedules_mixer_automation() -> None:
         event.module == "mixer:subgroup:band" and event.parameter == "fader_db"
         for event in mixer.automation_events
     )
+    assert any(
+        event.module == "mixer:return:plate" and event.parameter == "level_db"
+        for event in mixer.automation_events
+    )
 
     mixer.process_block(config.block_size)
     assert channel.get_send_level_db("plate") == pytest.approx(-6.0)
     assert subgroup.fader_db == pytest.approx(-6.0)
+    assert mixer.returns["plate"].level_db == pytest.approx(-6.0)
 
 
 def test_pattern_bridge_renders_audio_through_mixer_channel() -> None:
@@ -352,3 +370,4 @@ def test_pattern_bridge_renders_audio_through_mixer_channel() -> None:
     assert isinstance(restored_source, ConstantModule)
     assert playback.mixer_snapshot is not None
     assert "Lead" not in playback.mixer_snapshot.subgroup_meters  # channel bypasses subgroup
+    assert playback.mixer_snapshot.master_meter.peak_db <= 0.0

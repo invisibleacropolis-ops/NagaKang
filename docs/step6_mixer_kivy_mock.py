@@ -140,6 +140,12 @@ class MixerBoardAdapter:
         channel = self._graph.channels[channel_name]
         channel.move_insert(from_index, to_index)
 
+    def set_return_level(self, bus_name: str, level_db: float) -> None:
+        """Update a return bus level mirroring the CLI automation hooks."""
+
+        bus = self._graph.returns[bus_name]
+        bus.set_level_db(level_db)
+
     def update_channel_meter(self, widget: MixerStripWidget, channel_name: str) -> None:
         """Push the latest subgroup meter into a bound widget."""
 
@@ -148,6 +154,11 @@ class MixerBoardAdapter:
         if subgroup_name is not None:
             meter = self._graph.subgroup_meters.get(subgroup_name, meter)
         widget.update_meter(meter)
+
+    def master_meter(self) -> MeterReading:
+        """Expose the latest master bus meter for dashboard widgets."""
+
+        return self._graph.master_meter
 
 
 def build_demo_graph() -> MixerGraph:
