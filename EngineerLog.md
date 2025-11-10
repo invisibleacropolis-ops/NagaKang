@@ -1,3 +1,35 @@
+# Session Summary (Step 6 Mixer Preview Routing & Diagnostics – Effects & Routing)
+- Re-read README §§6 & 9 to confirm the preview/meter deliverables before wiring
+  the tracker bridge into the mixer pipeline.
+- Routed `PatternPerformanceBridge` renders through `MixerGraph` using instrument
+  ``mixer_channel`` macros, snapshotting subgroup meters/automation into the
+  returned playback payloads. (Step 6 mixer automation completion: ~64% ➜ ~78%)
+- Enhanced `tools/mixer_diagnostics.py` with BaseAudioModule sources, JSON export
+  via ``--output``, and prettier summaries for CI artifacts. (Step 6 regression
+  coverage completion: ~55% ➜ ~62%)
+- Expanded `docs/step6_mixer_kivy_mock.py` with live meter refresh helpers and
+  return-strip bindings so UI contributors can exercise the new mixer snapshots.
+  (Step 6 documentation completion: ~58% ➜ ~68%)
+- Ran `poetry run pytest` to exercise the mixer, tracker bridge, and automation
+  suites.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Mixer Automation & QA Integration (~78% ➜ 88%)**
+   - Publish CI recipes that bundle mixer snapshots alongside pattern renders,
+     feed the data into rehearsal dashboards, and extend the Kivy mock with
+     subgroup meter polling timers plus return-level gestures.
+
 # Session Summary (Step 6 Mixer Automation & QA Diagnostics – Effects & Routing)
 - Re-read README §§6 & 9 to confirm the automation + QA milestones before
   expanding the MixerGraph surface and CLI tooling.

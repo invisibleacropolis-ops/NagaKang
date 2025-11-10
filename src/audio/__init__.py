@@ -17,7 +17,11 @@ from .mixer import (
 )
 from .metrics import integrated_lufs, rms_dbfs, rms_per_channel
 from .modules import AmplitudeEnvelope, ClipSampler, OnePoleLowPass, SineOscillator
-from .tracker_bridge import PatternPerformanceBridge, PatternPlayback
+from .tracker_bridge import (
+    MixerPlaybackSnapshot,
+    PatternPerformanceBridge,
+    PatternPlayback,
+)
 
 __all__ = [
     "AutomationEvent",
@@ -33,6 +37,7 @@ __all__ = [
     "MixerSubgroup",
     "AmplitudeEnvelope",
     "ClipSampler",
+    "MixerPlaybackSnapshot",
     "PatternPerformanceBridge",
     "PatternPlayback",
     "OnePoleLowPass",

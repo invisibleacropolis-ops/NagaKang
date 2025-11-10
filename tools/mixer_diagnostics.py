@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
+from pathlib import Path
 from typing import Dict, List, Mapping
 
 import numpy as np
 
 from audio.effects import PlateReverbInsert, StereoFeedbackDelayInsert
-from audio.engine import EngineConfig
+from audio.engine import BaseAudioModule, EngineConfig
 from audio.mixer import (
     MeterReading,
     MixerChannel,
@@ -27,13 +28,12 @@ from audio.mixer import (
 )
 
 
-@dataclass
-class ConstantModule:
+class ConstantModule(BaseAudioModule):
     """Simple source used to feed deterministic levels into the mixer graph."""
 
-    name: str
-    config: EngineConfig
-    value: float
+    def __init__(self, name: str, config: EngineConfig, value: float) -> None:
+        super().__init__(name, config, [])
+        self.value = value
 
     def process(self, frames: int) -> np.ndarray:  # pragma: no cover - CLI helper
         return np.full((frames, self.config.channels), self.value, dtype=np.float32)
@@ -181,6 +181,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Pretty-print JSON output (implies --json).",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Write the diagnostics summary to the given file as JSON.",
+    )
     return parser.parse_args()
 
 
@@ -194,8 +200,15 @@ def main() -> int:
     _render_graph(graph, duration, args.blocks)
     summary = _build_summary(graph)
 
+    if args.output is not None:
+        args.json = True
+    payload = json.dumps(summary, indent=2 if args.pretty or args.output else None)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(payload)
+
     if args.json or args.pretty:
-        print(json.dumps(summary, indent=2 if args.pretty else None))
+        print(payload)
     else:
         print("Mixer Diagnostics Summary")
         print("==========================")

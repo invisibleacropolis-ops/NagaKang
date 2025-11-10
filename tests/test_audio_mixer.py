@@ -300,6 +300,7 @@ def test_pattern_bridge_schedules_mixer_automation() -> None:
         id="inst",
         name="Instrument",
         modules=[InstrumentModule(id="osc", type="sine")],
+        macros={"mixer_channel": ["Lead"]},
     )
 
     bridge = PatternPerformanceBridge(config, tempo, mixer=mixer)
@@ -317,3 +318,37 @@ def test_pattern_bridge_schedules_mixer_automation() -> None:
     mixer.process_block(config.block_size)
     assert channel.get_send_level_db("plate") == pytest.approx(-6.0)
     assert subgroup.fader_db == pytest.approx(-6.0)
+
+
+def test_pattern_bridge_renders_audio_through_mixer_channel() -> None:
+    config = EngineConfig(sample_rate=48_000, block_size=16, channels=2)
+    tempo = TempoMap(tempo_bpm=120.0)
+    mixer = MixerGraph(config)
+    channel = MixerChannel(
+        "Lead",
+        source=ConstantModule("silence", config, value=0.0),
+        config=config,
+    )
+    mixer.add_channel(channel)
+
+    pattern = Pattern(
+        id="pat",
+        name="Pat",
+        length_steps=4,
+        steps=[PatternStep(note=60, instrument_id="inst")],
+    )
+    instrument = InstrumentDefinition(
+        id="inst",
+        name="Instrument",
+        modules=[InstrumentModule(id="osc", type="sine")],
+        macros={"mixer_channel": ["Lead"]},
+    )
+
+    bridge = PatternPerformanceBridge(config, tempo, mixer=mixer)
+    playback = bridge.render_pattern(pattern, instrument)
+
+    assert np.any(np.abs(playback.buffer) > 0.0)
+    restored_source = mixer.channels["Lead"].source
+    assert isinstance(restored_source, ConstantModule)
+    assert playback.mixer_snapshot is not None
+    assert "Lead" not in playback.mixer_snapshot.subgroup_meters  # channel bypasses subgroup
