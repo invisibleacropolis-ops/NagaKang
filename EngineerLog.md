@@ -1,3 +1,34 @@
+# Session Summary (Step 6 Mixer QA Trend Exports & Return Solo Guidance – Effects & Routing)
+- Re-read README §§6 & 9 to confirm the Step 6 deliverables and QA milestones before extending
+  the mixer stack.
+- Added post-fader metering to `audio.mixer.MixerChannel` and surfaced the per-strip readings via
+  `MixerGraph.channel_post_meters`, wiring them into `PatternPlaybackSnapshot` so tracker previews
+  report strip/subgroup/master telemetry side by side. (Step 6 mixer automation completion:
+  ~88% ➜ ~96%)
+- Expanded `tools/mixer_diagnostics.py` with `--compare` diffing, channel-meter exports, and
+  richer console output so QA can chart successive automation captures without spreadsheets.
+  (Step 6 regression coverage completion: ~70% ➜ ~78%)
+- Updated `docs/step6_mixer_kickoff.md` and the Kivy mock (`docs/step6_mixer_kivy_mock.py`) to
+  document the new meter surfaces plus a return-solo rehearsal flow for automation audits.
+  (Step 6 documentation completion: ~76% ➜ ~86%)
+- Augmented `tests/test_audio_mixer.py` and introduced `tests/test_mixer_diagnostics.py` to cover
+  the new metering surfaces and CLI diff helpers, keeping QA confidence high as Step 6 closes out.
+- Ran `poetry run pytest` to validate the mixer, diagnostics, and tracker bridge changes.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket, attach LUFS
+     metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated screenshots
+     pairing loudness grades with smoothing totals, and land them in the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add checksum capture to the
+     uploaded artifact, and rehearse artifact retention expectations with QA.
+4. **Step 6 Mixer QA Automation Wrap-Up (~96% ➜ 100%)**
+   - Feed the CLI diff snapshots into the CI harness, chart per-strip peak history in the Kivy mock,
+     and persist mixer trend metadata in tracker notebook exports.
+
 # Session Summary (Step 6 Mixer Return Automation & Master Metering – Effects & Routing)
 - Re-read README §§6 & 9 to validate the return-level automation goals and QA
   telemetry expectations before extending the mixer stack.
