@@ -1,3 +1,38 @@
+# Session Summary (Step 6 Mixer Automation & QA Diagnostics – Effects & Routing)
+- Re-read README §§6 & 9 to confirm the automation + QA milestones before
+  expanding the MixerGraph surface and CLI tooling.
+- Extended `audio.mixer.MixerChannel`/`MixerGraph` with automation timelines,
+  send-level helpers, and insert reordering so tracker envelopes can drive
+  channel sends and subgroup faders while the mock UI supports drag moves.
+  (Step 6 mixer automation completion: ~45% ➜ ~64%)
+- Updated `audio.tracker_bridge.PatternPerformanceBridge` to interpret
+  `mixer:*` automation lanes, schedule events against MixerGraph, and log the
+  mixer gestures alongside existing module automation. (Step 6 regression
+  coverage completion: ~40% ➜ ~55%)
+- Authored `tools/mixer_diagnostics.py` and refreshed
+  `docs/step6_mixer_kickoff.md`/`docs/step6_mixer_kivy_mock.py` to expose meter
+  snapshots, automation exports, and return-strip affordances for outside
+  engineers. (Step 6 documentation completion: ~45% ➜ ~58%)
+- Ran `poetry run pytest` to exercise the expanded automation, mixer, and CLI
+  suites.
+
+## Outstanding TODOs / Next Session Goals
+1. **Sampler Expressiveness & Velocity Mapping (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders into the secure S3 bucket,
+     attach LUFS metadata, and share the JSON export workflow with remote QA.
+2. **Beat Loudness Visualisation in Tracker UI (~89% ➜ 92%)**
+   - Update the Kivy mock with the new segment breakdown row, capture annotated
+     screenshots pairing loudness grades with smoothing totals, and land them in
+     the rehearsal doc set.
+3. **Windows Installer Enablement (~66% ➜ 70%)**
+   - Extend the dry-run workflow with optional WiX harvesting stubs, add
+     checksum capture to the uploaded artifact, and rehearse artifact retention
+     expectations with QA.
+4. **Step 6 Mixer Automation & QA Integration (~64% ➜ 76%)**
+   - Pipe MixerGraph renders through the offline engine for pattern previews,
+     export automation/meter snapshots via CI artifacts, and expand the Kivy
+     mock with live meter bindings plus return-strip controls.
+
 # Session Summary (Step 6 Return FX & Nested Routing – Effects & Routing)
 - Re-read the Comprehensive Development Plan (README §§6 & 9) to confirm the
   Step 6 mixer roadmap before expanding the return-bus and routing surface.

@@ -13,11 +13,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Set
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Set
 
 import numpy as np
 
-from .engine import BaseAudioModule, EngineConfig
+from .engine import (
+    AutomationEvent,
+    AutomationTimeline,
+    BaseAudioModule,
+    EngineConfig,
+)
 
 
 InsertProcessor = Callable[[np.ndarray], np.ndarray]
@@ -124,10 +129,36 @@ class MixerChannel:
 
         self._inserts.append(processor)
 
+    def move_insert(self, from_index: int, to_index: int) -> None:
+        """Reorder inserts to support drag-and-drop style UI gestures."""
+
+        if not self._inserts:
+            raise IndexError("Channel has no inserts to reorder")
+        if from_index < 0 or from_index >= len(self._inserts):
+            raise IndexError("Insert move source index out of range")
+        to_index = max(0, min(int(to_index), len(self._inserts) - 1))
+        processor = self._inserts.pop(from_index)
+        self._inserts.insert(to_index, processor)
+
     def set_send(self, config: MixerSendConfig) -> None:
         """Register or update an auxiliary send."""
 
         self._sends[config.bus] = config
+
+    def set_send_level_db(self, bus: str, level_db: float) -> None:
+        """Update the decibel level for an existing send."""
+
+        if bus not in self._sends:
+            self._sends[bus] = MixerSendConfig(bus=bus, level_db=level_db)
+        else:
+            self._sends[bus].level_db = float(level_db)
+
+    def get_send_level_db(self, bus: str) -> float:
+        """Return the configured decibel level for *bus* (``-inf`` if missing)."""
+
+        if bus not in self._sends:
+            return -float("inf")
+        return float(self._sends[bus].level_db)
 
     def remove_send(self, bus: str) -> None:
         """Remove a configured send if present."""
@@ -205,6 +236,10 @@ class MixerSubgroup:
         self._fader_gain = _db_to_linear(self._fader_db)
 
     @property
+    def fader_db(self) -> float:
+        return self._fader_db
+
+    @property
     def muted(self) -> bool:
         return self._muted
 
@@ -260,6 +295,10 @@ class MixerReturnBus:
         self._level_db = float(value)
         self._gain = _db_to_linear(self._level_db)
 
+    @property
+    def level_db(self) -> float:  # pragma: no cover - simple accessor
+        return self._level_db
+
     def process(self, buffer: np.ndarray) -> np.ndarray:
         working = buffer
         if self._processor is not None:
@@ -270,7 +309,12 @@ class MixerReturnBus:
 class MixerGraph:
     """Block-based mixer that sums channels, sends, and return buses."""
 
-    def __init__(self, config: EngineConfig, *, master_fader_db: float = 0.0) -> None:
+    def __init__(
+        self,
+        config: EngineConfig,
+        *,
+        master_fader_db: float = 0.0,
+    ) -> None:
         self.config = config
         self._channels: MutableMapping[str, MixerChannel] = {}
         self._subgroups: MutableMapping[str, MixerSubgroup] = {}
@@ -280,6 +324,9 @@ class MixerGraph:
         self._master_fader_db = master_fader_db
         self._master_gain = _db_to_linear(master_fader_db)
         self._last_subgroup_meters: Dict[str, MeterReading] = {}
+        self._timeline = AutomationTimeline()
+        self._processed_frames = 0
+        self._automation_events: List[AutomationEvent] = []
 
     def add_channel(self, channel: MixerChannel) -> None:
         if channel.name in self._channels:
@@ -342,6 +389,10 @@ class MixerGraph:
     def subgroup_meters(self) -> Mapping[str, MeterReading]:
         return dict(self._last_subgroup_meters)
 
+    @property
+    def automation_events(self) -> List[AutomationEvent]:  # pragma: no cover - view helper
+        return list(self._automation_events)
+
     def _subgroup_children(self) -> Dict[str, Set[str]]:
         children: Dict[str, Set[str]] = {name: set() for name in self._subgroups}
         for child, parent in self._subgroup_routes.items():
@@ -378,6 +429,10 @@ class MixerGraph:
         return order
 
     def process_block(self, frames: int) -> np.ndarray:
+        block_start_time = self._processed_frames / float(self.config.sample_rate)
+        for event in self._timeline.pop_events_up_to(block_start_time):
+            self._apply_automation_event(event)
+
         master = np.zeros((frames, self.config.channels), dtype=np.float32)
         send_sums: Dict[str, np.ndarray] = {
             name: np.zeros((frames, self.config.channels), dtype=np.float32)
@@ -443,9 +498,11 @@ class MixerGraph:
             master += processed
 
         self._last_subgroup_meters = meters
+        self._processed_frames += frames
         return master * self._master_gain
 
     def render(self, duration_seconds: float) -> np.ndarray:
+        self._processed_frames = 0
         total_frames = int(round(duration_seconds * self.config.sample_rate))
         output = np.zeros((total_frames, self.config.channels), dtype=np.float32)
         for frame_start in range(0, total_frames, self.config.block_size):
@@ -453,6 +510,67 @@ class MixerGraph:
             block = self.process_block(block_frames)
             output[frame_start : frame_start + block_frames, :] = block
         return output
+
+    # ------------------------------------------------------------------
+    # Automation helpers
+    # ------------------------------------------------------------------
+    def reset_automation_state(self) -> None:
+        """Clear processed time so subsequent renders replay automation."""
+
+        self._processed_frames = 0
+
+    def schedule_parameter_change(
+        self,
+        module: str,
+        parameter: str,
+        *,
+        value: float | None,
+        time_seconds: float,
+        source: str = "",
+    ) -> None:
+        event = AutomationEvent(
+            time_seconds=float(time_seconds),
+            module=module,
+            parameter=parameter,
+            value=value,
+            source=source,
+        )
+        self._automation_events.append(event)
+        self._timeline.schedule(event)
+
+    def _apply_automation_event(self, event: AutomationEvent) -> None:
+        module = event.module
+        if not module.startswith("mixer:"):
+            return
+        parts = module.split(":", 2)
+        if len(parts) < 3:
+            return
+        scope = parts[1]
+        target = parts[2]
+        value = event.value
+        if scope == "channel":
+            channel = self._channels.get(target)
+            if channel is None:
+                return
+            parameter = event.parameter
+            if parameter == "fader_db" and value is not None:
+                channel.set_fader_db(float(value))
+            elif parameter == "pan" and value is not None:
+                channel.set_pan(float(value))
+            elif parameter == "mute":
+                channel.set_muted(bool(value and float(value) >= 0.5))
+            elif parameter.startswith("send:"):
+                _, _, bus = parameter.partition(":")
+                level = -float("inf") if value is None else float(value)
+                channel.set_send_level_db(bus, level)
+        elif scope == "subgroup":
+            subgroup = self._subgroups.get(target)
+            if subgroup is None:
+                return
+            if event.parameter == "fader_db" and value is not None:
+                subgroup.set_fader_db(float(value))
+            elif event.parameter == "mute":
+                subgroup.set_muted(bool(value and float(value) >= 0.5))
 
 
 __all__ = [

@@ -121,6 +121,32 @@ from a stable baseline.
   gesture vocabulary (vertical swipes for coarse adjustment, horizontal
   drags for fine) and expose modifier affordances for mouse/pen users.
 
+## Mixer Automation & QA Diagnostics
+
+- Tracker automation lanes targeting `mixer:channel:*` and
+  `mixer:subgroup:*` endpoints now schedule events directly against
+  :class:`audio.mixer.MixerGraph`.  Normalised curves and `|range=`
+  overrides map cleanly onto send levels, subgroup faders, and mute
+  toggles so tracker envelopes can drive real routing gestures.
+- `MixerGraph` exposes a musician-friendly automation timeline, replaying
+  events on block boundaries and logging them for downstream tooling. The
+  tracker bridge resets the graph between renders and logs the mixer
+  events alongside instrument automation for audit trails.
+- New CLI: ``poetry run python tools/mixer_diagnostics.py`` renders the
+  demo graph, prints subgroup meters, return levels, and the scheduled
+  automation events (``--json``/``--pretty`` available for QA exports).
+
+## Kivy Mock Enhancements
+
+- `docs/step6_mixer_kivy_mock.py` gained insert reordering helpers and
+  return-strip state so UI contributors can simulate drag-and-drop insert
+  moves plus dedicated return bus columns without booting full Kivy
+  builds.
+- `MixerStripWidget` now tracks insert order and return-state hints,
+  while ``MixerBoardAdapter`` exposes ``return_state`` and
+  ``reorder_channel_inserts`` helpers mirroring the new backend
+  capabilities.
+
 ## Next Steps
 
 1. Expand mixer automation hooks so tracker envelopes can target send

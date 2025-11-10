@@ -10,6 +10,7 @@ import numpy as np
 from domain.models import AutomationPoint, InstrumentDefinition, Pattern, PatternStep
 
 from .engine import EngineConfig, OfflineAudioEngine, ParameterSpec, TempoMap
+from .mixer import MixerGraph
 from .metrics import integrated_lufs, rms_dbfs
 from .modules import (
     AmplitudeEnvelope,
@@ -63,11 +64,13 @@ class PatternPerformanceBridge:
         tempo: TempoMap,
         *,
         sample_library: Mapping[str, np.ndarray] | None = None,
+        mixer: MixerGraph | None = None,
     ) -> None:
         self.config = config
         self.tempo = tempo
         self.sample_library = sample_library or {}
         self._log_counter = 0
+        self._mixer = mixer
 
     # ------------------------------------------------------------------
     # Public API
@@ -81,6 +84,8 @@ class PatternPerformanceBridge:
         modules = self._instantiate_instrument(engine, instrument)
 
         automation_log: List[dict[str, object]] = []
+        if self._mixer is not None:
+            self._mixer.reset_automation_state()
         self._schedule_steps(engine, pattern, instrument, modules, automation_log)
         self._schedule_automation_lanes(engine, pattern, modules, automation_log)
 
@@ -513,26 +518,37 @@ class PatternPerformanceBridge:
         modules: Mapping[str, SineOscillator | ClipSampler | AmplitudeEnvelope | OnePoleLowPass],
         automation_log: List[dict[str, object]],
     ) -> None:
-        pending: dict[tuple[str, str, float], list[dict[str, object]]] = {}
-        last_values: dict[tuple[str, str], float | None] = {}
+        pending: dict[tuple[str, str, str, float], list[dict[str, object]]] = {}
+        last_values: dict[tuple[str, str, str], float | None] = {}
         for lane_index, (lane, points) in enumerate(pattern.automation.items()):
             module_name, parameter_name, metadata = self._parse_lane_metadata(lane)
             if module_name is None or parameter_name is None:
                 continue
-            if module_name not in modules:
-                raise KeyError(f"Automation lane references unknown module '{module_name}'")
-            module = modules[module_name]
-            spec = self._resolve_parameter_spec(module, parameter_name)
-            if spec is None:
-                raise KeyError(
-                    f"Automation lane '{lane}' references unknown parameter '{parameter_name}'"
-                )
+            target_type = "module"
+            if module_name in modules:
+                module = modules[module_name]
+                spec = self._resolve_parameter_spec(module, parameter_name)
+                if spec is None:
+                    raise KeyError(
+                        f"Automation lane '{lane}' references unknown parameter '{parameter_name}'"
+                    )
+            else:
+                if not (module_name.startswith("mixer:") and self._mixer is not None):
+                    raise KeyError(
+                        f"Automation lane references unknown module '{module_name}'"
+                    )
+                target_type = "mixer"
+                spec = self._resolve_mixer_parameter_spec(module_name, parameter_name)
+                if spec is None:
+                    raise KeyError(
+                        f"Automation lane '{lane}' references unsupported mixer parameter '{parameter_name}'"
+                    )
             value_mapper = self._automation_value_mapper(spec, metadata)
             for point in points:
                 if not isinstance(point, AutomationPoint):
                     continue
                 resolved_value = value_mapper(point.value)
-                key = (module_name, parameter_name, float(point.position_beats))
+                key = (target_type, module_name, parameter_name, float(point.position_beats))
                 bucket = pending.setdefault(key, [])
                 bucket.append(
                     {
@@ -544,11 +560,12 @@ class PatternPerformanceBridge:
                         "lane_metadata": metadata,
                         "lane_name": lane,
                         "lane_index": lane_index,
+                        "target_type": target_type,
                     }
                 )
 
-        for (module_name, parameter_name, beat), events in sorted(
-            pending.items(), key=lambda item: (item[0][2], item[0][0], item[0][1])
+        for (target_type, module_name, parameter_name, beat), events in sorted(
+            pending.items(), key=lambda item: (item[0][3], item[0][1], item[0][2])
         ):
             values = [event["value"] for event in events]
             has_none = any(value is None for value in values)
@@ -562,12 +579,15 @@ class PatternPerformanceBridge:
             else:
                 aggregated_value = sum(numeric_values) / len(numeric_values)
 
-            key = (module_name, parameter_name)
+            key = (target_type, module_name, parameter_name)
             if key not in last_values:
-                try:
-                    last_values[key] = modules[module_name].get_parameter(parameter_name)  # type: ignore[arg-type]
-                except KeyError:
-                    last_values[key] = None
+                if target_type == "module":
+                    try:
+                        last_values[key] = modules[module_name].get_parameter(parameter_name)  # type: ignore[arg-type]
+                    except KeyError:
+                        last_values[key] = None
+                else:
+                    last_values[key] = self._get_mixer_parameter(module_name, parameter_name)
             previous_value = last_values.get(key)
 
             smoothing_beats_candidates = [
@@ -583,6 +603,24 @@ class PatternPerformanceBridge:
             segments_override = max(candidate_values) if candidate_values else None
             smoothing_applied = False
             smoothing_info: dict[str, object] | None = None
+
+            def schedule_change(event_beat: float, value: float | None, source: str) -> None:
+                if target_type == "module":
+                    engine.schedule_parameter_change(
+                        module_name,
+                        parameter_name,
+                        beats=event_beat,
+                        value=value,
+                        source=source,
+                    )
+                else:
+                    self._schedule_mixer_change(
+                        module_name,
+                        parameter_name,
+                        beats=event_beat,
+                        value=value,
+                        source=source,
+                    )
 
             if (
                 smoothing_beats > 0.0
@@ -611,13 +649,7 @@ class PatternPerformanceBridge:
                         event_beat = start_beat + step_beats * idx
                         value = previous_value + (aggregated_value - previous_value) * ratio
                         source = "pattern_automation" if idx == segments - 1 else "pattern_automation_smooth"
-                        engine.schedule_parameter_change(
-                            module_name,
-                            parameter_name,
-                            beats=event_beat,
-                            value=value,
-                            source=source,
-                        )
+                        schedule_change(event_beat, value, source)
                     smoothing_applied = True
                     smoothing_info = {
                         "window_beats": window_beats,
@@ -627,12 +659,10 @@ class PatternPerformanceBridge:
                         "strategy": "linear_ramp",
                     }
             if not smoothing_applied:
-                engine.schedule_parameter_change(
-                    module_name,
-                    parameter_name,
-                    beats=beat,
-                    value=aggregated_value,
-                    source="pattern_automation",
+                schedule_change(
+                    beat,
+                    aggregated_value,
+                    "pattern_automation",
                 )
                 if smoothing_beats > 0.0:
                     smoothing_info = {
@@ -774,6 +804,144 @@ class PatternPerformanceBridge:
         for spec in module.describe_parameters():
             if spec.name == parameter:
                 return spec
+        return None
+
+    def _parse_mixer_target(self, module_name: str) -> tuple[str, str] | None:
+        if not module_name.startswith("mixer:"):
+            return None
+        parts = module_name.split(":", 2)
+        if len(parts) != 3:
+            return None
+        return parts[1], parts[2]
+
+    def _resolve_mixer_parameter_spec(
+        self,
+        module_name: str,
+        parameter: str,
+    ) -> ParameterSpec | None:
+        target = self._parse_mixer_target(module_name)
+        if target is None:
+            return None
+        scope, name = target
+        if scope == "channel":
+            if parameter == "fader_db":
+                return ParameterSpec(
+                    name="fader_db",
+                    display_name=f"Channel {name} Fader",
+                    default=0.0,
+                    minimum=-60.0,
+                    maximum=12.0,
+                    unit="dB",
+                    description="Main strip fader level in decibels.",
+                    musical_context="mix",
+                )
+            if parameter == "pan":
+                return ParameterSpec(
+                    name="pan",
+                    display_name=f"Channel {name} Pan",
+                    default=0.0,
+                    minimum=-1.0,
+                    maximum=1.0,
+                    unit="",
+                    description="Stereo pan position (-1 = left, 1 = right).",
+                    musical_context="mix",
+                )
+            if parameter == "mute":
+                return ParameterSpec(
+                    name="mute",
+                    display_name=f"Channel {name} Mute",
+                    default=0.0,
+                    minimum=0.0,
+                    maximum=1.0,
+                    unit="",
+                    description="Channel mute toggle (0 = off, 1 = on).",
+                    musical_context="mix",
+                )
+            if parameter.startswith("send:"):
+                _, _, bus = parameter.partition(":")
+                return ParameterSpec(
+                    name=parameter,
+                    display_name=f"Send to {bus or 'bus'}",
+                    default=-12.0,
+                    minimum=-60.0,
+                    maximum=12.0,
+                    unit="dB",
+                    description="Auxiliary send level in decibels.",
+                    musical_context="mix",
+                )
+        elif scope == "subgroup":
+            if parameter == "fader_db":
+                return ParameterSpec(
+                    name="fader_db",
+                    display_name=f"Subgroup {name} Fader",
+                    default=0.0,
+                    minimum=-60.0,
+                    maximum=12.0,
+                    unit="dB",
+                    description="Subgroup fader level in decibels.",
+                    musical_context="mix",
+                )
+            if parameter == "mute":
+                return ParameterSpec(
+                    name="mute",
+                    display_name=f"Subgroup {name} Mute",
+                    default=0.0,
+                    minimum=0.0,
+                    maximum=1.0,
+                    unit="",
+                    description="Subgroup mute toggle (0 = off, 1 = on).",
+                    musical_context="mix",
+                )
+        return None
+
+    def _schedule_mixer_change(
+        self,
+        module_name: str,
+        parameter: str,
+        *,
+        beats: float,
+        value: float | None,
+        source: str,
+    ) -> None:
+        if self._mixer is None:
+            return
+        time_seconds = self.tempo.beats_to_seconds(beats)
+        self._mixer.schedule_parameter_change(
+            module_name,
+            parameter,
+            value=value,
+            time_seconds=time_seconds,
+            source=source,
+        )
+
+    def _get_mixer_parameter(self, module_name: str, parameter: str) -> float | None:
+        if self._mixer is None:
+            return None
+        target = self._parse_mixer_target(module_name)
+        if target is None:
+            return None
+        scope, name = target
+        if scope == "channel":
+            channel = self._mixer.channels.get(name)
+            if channel is None:
+                return None
+            if parameter == "fader_db":
+                return channel.fader_db
+            if parameter == "pan":
+                return channel.pan
+            if parameter == "mute":
+                return 1.0 if channel.muted else 0.0
+            if parameter.startswith("send:"):
+                _, _, bus = parameter.partition(":")
+                return channel.get_send_level_db(bus)
+        elif scope == "subgroup":
+            subgroup = self._mixer.subgroups.get(name)
+            if subgroup is None:
+                return None
+            if parameter == "fader_db":
+                return subgroup.fader_db
+            if parameter == "mute":
+                return 1.0 if subgroup.muted else 0.0
         return None
 
     def _automation_value_mapper(
