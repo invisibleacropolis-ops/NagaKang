@@ -2,15 +2,23 @@
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Sequence
+from typing import Callable, Dict, Iterable, Iterator, List, Mapping, MutableMapping, Sequence
 
 import numpy as np
 
 from domain.models import AutomationPoint, InstrumentDefinition, Pattern, PatternStep
 
-from .engine import EngineConfig, OfflineAudioEngine, ParameterSpec, TempoMap
-from .mixer import MixerGraph
+from .engine import (
+    AutomationEvent,
+    BaseAudioModule,
+    EngineConfig,
+    OfflineAudioEngine,
+    ParameterSpec,
+    TempoMap,
+)
+from .mixer import MeterReading, MixerGraph
 from .metrics import integrated_lufs, rms_dbfs
 from .modules import (
     AmplitudeEnvelope,
@@ -53,6 +61,16 @@ class PatternPlayback:
     beat_frames: List[int]
     module_parameters: Dict[str, Dict[str, float | None]]
     automation_log: List[dict[str, object]]
+    mixer_snapshot: "MixerPlaybackSnapshot | None" = None
+
+
+@dataclass
+class MixerPlaybackSnapshot:
+    """Snapshot of mixer state captured during :class:`PatternPlayback`."""
+
+    subgroup_meters: Dict[str, MeterReading]
+    automation_events: List[AutomationEvent]
+    return_levels: Dict[str, float]
 
 
 class PatternPerformanceBridge:
@@ -85,12 +103,13 @@ class PatternPerformanceBridge:
 
         automation_log: List[dict[str, object]] = []
         if self._mixer is not None:
-            self._mixer.reset_automation_state()
+            self._mixer.reset_automation_state(clear_events=True)
         self._schedule_steps(engine, pattern, instrument, modules, automation_log)
         self._schedule_automation_lanes(engine, pattern, modules, automation_log)
 
         duration_seconds = self.tempo.beats_to_seconds(pattern.duration_beats)
-        buffer = engine.render(duration_seconds)
+        with self._prepare_mixer_render(engine, instrument, modules):
+            buffer = engine.render(duration_seconds)
 
         beat_frames = self._beat_frames(pattern.duration_beats)
         module_parameters = {
@@ -98,12 +117,15 @@ class PatternPerformanceBridge:
             for name, module in modules.items()
         }
 
+        mixer_snapshot = self._snapshot_mixer_state()
+
         return PatternPlayback(
             buffer=buffer,
             duration_seconds=duration_seconds,
             beat_frames=beat_frames,
             module_parameters=module_parameters,
             automation_log=automation_log,
+            mixer_snapshot=mixer_snapshot,
         )
 
     def loudness_trends(
@@ -894,6 +916,75 @@ class PatternPerformanceBridge:
                 )
         return None
 
+    def _resolve_mixer_channels(self, instrument: InstrumentDefinition) -> List[str]:
+        if not instrument.macros:
+            return []
+        names: List[str] = []
+        for key in ("mixer_channel", "mixer_channels"):
+            raw = instrument.macros.get(key, [])
+            for name in raw:
+                if not isinstance(name, str):
+                    continue
+                normalized = name.strip()
+                if normalized:
+                    names.append(normalized)
+        return names
+
+    @contextmanager
+    def _prepare_mixer_render(
+        self,
+        engine: OfflineAudioEngine,
+        instrument: InstrumentDefinition,
+        modules: Mapping[
+            str,
+            SineOscillator | ClipSampler | AmplitudeEnvelope | OnePoleLowPass,
+        ],
+    ) -> Iterator[None]:
+        if self._mixer is None:
+            yield
+            return
+        channel_names = self._resolve_mixer_channels(instrument)
+        if not channel_names or not instrument.modules:
+            yield
+            return
+        output_id = instrument.modules[-1].id
+        source_module = modules.get(output_id)
+        if source_module is None:
+            yield
+            return
+
+        original_sources: Dict[str, BaseAudioModule] = {}
+        try:
+            for channel_name in channel_names:
+                channel = self._mixer.channels.get(channel_name)
+                if channel is None:
+                    raise KeyError(f"Mixer channel '{channel_name}' not configured for preview")
+                original_sources[channel_name] = channel.source
+                channel.set_source(source_module)
+            mixer_module = _MixerRenderModule(
+                f"{instrument.id}_mixer_output",
+                self.config,
+                self._mixer,
+            )
+            engine.add_module(mixer_module, as_output=True)
+            yield
+        finally:
+            for channel_name, original in original_sources.items():
+                channel = self._mixer.channels.get(channel_name)
+                if channel is not None:
+                    channel.set_source(original)
+            if self._mixer is not None:
+                self._mixer.reset_automation_state()
+
+    def _snapshot_mixer_state(self) -> "MixerPlaybackSnapshot | None":
+        if self._mixer is None:
+            return None
+        return MixerPlaybackSnapshot(
+            subgroup_meters=dict(self._mixer.subgroup_meters),
+            automation_events=list(self._mixer.automation_events),
+            return_levels={name: bus.level_db for name, bus in self._mixer.returns.items()},
+        )
+
     def _schedule_mixer_change(
         self,
         module_name: str,
@@ -1073,5 +1164,16 @@ class PatternPerformanceBridge:
         return float(note - root)
 
 
-__all__ = ["PatternPerformanceBridge", "PatternPlayback"]
+class _MixerRenderModule(BaseAudioModule):
+    """Offline engine proxy that renders a :class:`MixerGraph`."""
+
+    def __init__(self, name: str, config: EngineConfig, mixer: MixerGraph) -> None:
+        super().__init__(name, config, [])
+        self._mixer = mixer
+
+    def process(self, frames: int) -> np.ndarray:
+        return self._mixer.process_block(frames)
+
+
+__all__ = ["PatternPerformanceBridge", "PatternPlayback", "MixerPlaybackSnapshot"]
 

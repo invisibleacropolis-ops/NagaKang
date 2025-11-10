@@ -128,6 +128,11 @@ from a stable baseline.
   :class:`audio.mixer.MixerGraph`.  Normalised curves and `|range=`
   overrides map cleanly onto send levels, subgroup faders, and mute
   toggles so tracker envelopes can drive real routing gestures.
+- :class:`audio.tracker_bridge.PatternPerformanceBridge` now pipes pattern
+  renders through :class:`audio.mixer.MixerGraph` whenever instruments
+  declare a ``mixer_channel`` macro.  Mixer automation replays inside the
+  offline engine, snapshots land on ``PatternPlayback`` objects, and
+  preview buffers inherit subgroup/return processing.
 - `MixerGraph` exposes a musician-friendly automation timeline, replaying
   events on block boundaries and logging them for downstream tooling. The
   tracker bridge resets the graph between renders and logs the mixer
@@ -135,6 +140,8 @@ from a stable baseline.
 - New CLI: ``poetry run python tools/mixer_diagnostics.py`` renders the
   demo graph, prints subgroup meters, return levels, and the scheduled
   automation events (``--json``/``--pretty`` available for QA exports).
+- Diagnostics CLI learned ``--output`` for CI runs so automation/meter
+  snapshots land in JSON artifacts without extra scripting.
 
 ## Kivy Mock Enhancements
 
@@ -146,6 +153,9 @@ from a stable baseline.
   while ``MixerBoardAdapter`` exposes ``return_state`` and
   ``reorder_channel_inserts`` helpers mirroring the new backend
   capabilities.
+- Adapter now exposes ``update_channel_meter`` and ``bind_return_to_widget``
+  so docs can demonstrate live meter polling alongside return-strip
+  level controls.
 
 ## Next Steps
 

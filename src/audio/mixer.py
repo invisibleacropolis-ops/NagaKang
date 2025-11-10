@@ -92,6 +92,17 @@ class MixerChannel:
         self._sends: Dict[str, MixerSendConfig] = {send.bus: send for send in sends or []}
 
     @property
+    def source(self) -> BaseAudioModule:
+        """Return the audio module feeding this channel."""
+
+        return self._source
+
+    def set_source(self, source: BaseAudioModule) -> None:
+        """Update the audio module feeding this channel."""
+
+        self._source = source
+
+    @property
     def pan(self) -> float:
         return self._pan
 
@@ -514,10 +525,17 @@ class MixerGraph:
     # ------------------------------------------------------------------
     # Automation helpers
     # ------------------------------------------------------------------
-    def reset_automation_state(self) -> None:
-        """Clear processed time so subsequent renders replay automation."""
+    def reset_automation_state(self, *, clear_events: bool = False) -> None:
+        """Reset processed time and optionally clear scheduled automation."""
 
         self._processed_frames = 0
+        if clear_events:
+            self._automation_events.clear()
+        timeline = AutomationTimeline()
+        if not clear_events:
+            for event in self._automation_events:
+                timeline.schedule(event)
+        self._timeline = timeline
 
     def schedule_parameter_change(
         self,

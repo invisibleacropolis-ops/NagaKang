@@ -51,6 +51,7 @@ class MixerStripState:
     sends: Mapping[str, float]
     insert_order: List[str]
     is_return: bool = False
+    return_level_db: float | None = None
 
 
 class MixerStripWidget(BoxLayout):
@@ -62,6 +63,7 @@ class MixerStripWidget(BoxLayout):
     send_levels = DictProperty({})
     insert_order = ListProperty([])
     is_return = BooleanProperty(False)
+    return_level_db = NumericProperty(0.0)
 
     def apply_state(self, state: MixerStripState) -> None:
         self.strip_name = state.name
@@ -70,6 +72,13 @@ class MixerStripWidget(BoxLayout):
         self.send_levels = dict(state.sends)
         self.insert_order = list(state.insert_order)
         self.is_return = bool(state.is_return)
+        self.return_level_db = float(state.return_level_db or 0.0)
+
+    def update_meter(self, meter: MeterReading) -> None:
+        """Refresh meter properties without reapplying the full strip state."""
+
+        self.meter_peak_db = meter.peak_db
+        self.meter_rms_db = meter.rms_db
 
 
 class MixerBoardAdapter:
@@ -107,6 +116,9 @@ class MixerBoardAdapter:
     def bind_to_widget(self, widget: MixerStripWidget, channel_name: str) -> None:
         widget.apply_state(self.strip_state(channel_name))
 
+    def bind_return_to_widget(self, widget: MixerStripWidget, bus_name: str) -> None:
+        widget.apply_state(self.return_state(bus_name))
+
     def return_state(self, bus_name: str) -> MixerStripState:
         bus = self._graph.returns[bus_name]
         processor = getattr(bus, "_processor", None)
@@ -121,11 +133,21 @@ class MixerBoardAdapter:
             sends={},
             insert_order=[processor_label],
             is_return=True,
+            return_level_db=bus.level_db,
         )
 
     def reorder_channel_inserts(self, channel_name: str, from_index: int, to_index: int) -> None:
         channel = self._graph.channels[channel_name]
         channel.move_insert(from_index, to_index)
+
+    def update_channel_meter(self, widget: MixerStripWidget, channel_name: str) -> None:
+        """Push the latest subgroup meter into a bound widget."""
+
+        subgroup_name = self._graph.channel_groups.get(channel_name)
+        meter = MeterReading(-float("inf"), -float("inf"))
+        if subgroup_name is not None:
+            meter = self._graph.subgroup_meters.get(subgroup_name, meter)
+        widget.update_meter(meter)
 
 
 def build_demo_graph() -> MixerGraph:
