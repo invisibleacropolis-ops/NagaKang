@@ -1,7 +1,9 @@
 """Tracker panel widgets and controllers for the Step 7 GUI shell."""
 from __future__ import annotations
 
+import math
 import uuid
+from typing import List
 
 from domain.models import PatternStep
 from tracker.pattern_editor import PatternEditor, PlaybackRequest, StepMutation
@@ -10,7 +12,13 @@ from tracker.preview_service import MutationPreviewService
 from .state import TrackerPanelState
 
 try:  # pragma: no cover - optional dependency for GUI runtimes
-    from kivy.properties import DictProperty, ListProperty, NumericProperty, StringProperty
+    from kivy.properties import (
+        BooleanProperty,
+        DictProperty,
+        ListProperty,
+        NumericProperty,
+        StringProperty,
+    )
     from kivy.uix.boxlayout import BoxLayout
 except Exception:  # pragma: no cover - fallback for headless CI and docs builds
     class BoxLayout:  # type: ignore
@@ -28,6 +36,9 @@ except Exception:  # pragma: no cover - fallback for headless CI and docs builds
 
     def StringProperty(default: str = ""):
         return default
+
+    def BooleanProperty(default: bool = False):  # type: ignore
+        return bool(default)
 
 
 class TrackerGridWidget(BoxLayout):
@@ -67,6 +78,47 @@ class LoudnessTableWidget(BoxLayout):
         self.loudness_rows = list(state.loudness_rows)
 
 
+class TransportControlsWidget(BoxLayout):
+    """Transport control strip binding transport/tutorial state into widgets."""
+
+    tempo_bpm = NumericProperty(120.0)
+    is_playing = BooleanProperty(False)
+    loop_window_steps = NumericProperty(16.0)
+    tutorial_tips = ListProperty([])
+    onboarding_hint = StringProperty("")
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._controller: TrackerPanelController | None = None
+
+    def bind_controller(self, controller: "TrackerPanelController") -> None:
+        self._controller = controller
+
+    def apply_state(self, state: TrackerPanelState) -> None:
+        self.tempo_bpm = float(state.tempo_bpm)
+        self.is_playing = bool(state.is_playing)
+        self.loop_window_steps = float(state.loop_window_steps)
+        self.tutorial_tips = list(state.tutorial_tips)
+        self.onboarding_hint = state.tutorial_tips[0] if state.tutorial_tips else ""
+
+    def start_playback(self, *, start_step: int = 0) -> List[PlaybackRequest]:
+        if self._controller is None:
+            return []
+        requests = self._controller.preview_loop(
+            start_step=start_step,
+            window_steps=self.loop_window_steps,
+        )
+        if requests:
+            self.is_playing = True
+        return requests
+
+    def stop_playback(self) -> None:
+        if self._controller is None:
+            return
+        self._controller.stop_preview()
+        self.is_playing = False
+
+
 class TrackerPanelController:
     """Bridges tracker gestures to preview queue mutations."""
 
@@ -101,6 +153,45 @@ class TrackerPanelController:
             step_duration_beats=duration,
         )
 
+    def preview_loop(
+        self,
+        *,
+        start_step: int = 0,
+        window_steps: float | None = None,
+    ) -> List[PlaybackRequest]:
+        pattern = self.editor.pattern
+        total_steps = pattern.length_steps
+        if window_steps is None:
+            window_steps = total_steps - start_step
+        if window_steps is None or window_steps <= 0:
+            raise ValueError("window_steps must be positive")
+        start_index = max(0, int(start_step))
+        end_index = min(total_steps, start_index + int(math.ceil(window_steps)))
+        requests: List[PlaybackRequest] = []
+        for index in range(start_index, end_index):
+            step = self._copy_step(index)
+            if step.note is None:
+                continue
+            mutation = StepMutation(
+                mutation_id=f"loop_{uuid.uuid4().hex}",
+                index=index,
+                previous=step,
+                updated=step,
+            )
+            start = self.editor.step_to_beat(index)
+            duration = self.editor.steps_to_beats(1.0)
+            requests.append(
+                self._service.enqueue_mutation(
+                    mutation,
+                    start_beat=start,
+                    step_duration_beats=duration,
+                )
+            )
+        return requests
+
+    def stop_preview(self) -> None:
+        self._service.queue.clear()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -114,5 +205,6 @@ class TrackerPanelController:
 __all__ = [
     "TrackerGridWidget",
     "LoudnessTableWidget",
+    "TransportControlsWidget",
     "TrackerPanelController",
 ]

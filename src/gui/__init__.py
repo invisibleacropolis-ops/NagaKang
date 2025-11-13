@@ -8,6 +8,7 @@ from .tracker_panel import (
     LoudnessTableWidget,
     TrackerGridWidget,
     TrackerPanelController,
+    TransportControlsWidget,
 )
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "TrackerMixerLayoutState",
     "TrackerGridWidget",
     "LoudnessTableWidget",
+    "TransportControlsWidget",
     "TrackerPanelController",
 ]

@@ -17,6 +17,10 @@ class TrackerPanelState:
     pending_requests: List[Dict[str, object]] = field(default_factory=list)
     last_preview_summary: Dict[str, object] | None = None
     loudness_rows: List[Dict[str, object]] = field(default_factory=list)
+    tempo_bpm: float = 120.0
+    is_playing: bool = False
+    loop_window_steps: float = 16.0
+    tutorial_tips: List[str] = field(default_factory=list)
 
 
 @dataclass
