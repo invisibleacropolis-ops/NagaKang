@@ -1,3 +1,19 @@
+# Session Summary (Step 7 Transport & Tutorial Widgets – GUI/UX Implementation)
+- Re-read README §7 plus the Step 1 UX flows to confirm the transport, onboarding copy, and loop-audition scope before adding new widgets (Plan verification: ~8% ➜ ~11%).
+- Extended `src/gui/state.py` with tempo/transport/tutorial fields so tracker widgets can mirror Step 1 onboarding text and play-state telemetry inside `TrackerMixerLayoutState`. (Step 7 tracker widget completion: ~20% ➜ ~28%.)
+- Added `TransportControlsWidget`, loop playback helpers inside `TrackerPanelController`, and state-driven tutorial bindings so Kivy layouts can trigger play/stop gestures that reuse the preview queue without duplicating logic. (Step 7 transport scaffolding completion: ~0% ➜ ~35%.)
+- Updated `docs/step7_gui_shell.md` and `docs/documentation_structure.md` to document the new transport/tutorial contracts for external GUI engineers. (Step 7 documentation completion: ~22% ➜ ~30%.)
+- Expanded `tests/test_gui_tracker_panel.py` to cover transport bindings, loop preview validation, and controller guards, keeping the new widgets regression-tested. (Step 7 regression coverage: ~16% ➜ ~22%.)
+- Ran `poetry run pytest` to exercise the augmented GUI tests alongside the broader suite.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 7 Transport & Tutorial Polish (~28% ➜ ~36%)**
+   - Thread the new transport widget into `TrackerMixerApp`, capture annotated screenshots highlighting the onboarding hints, and script KV bindings for loop-length controls.
+2. **CI Mixer Trend Artifacts Integration (~96% ➜ 100%)**
+   - Thread `tools/mixer_diagnostics.py --compare` exports into CI, persist trend snapshots beside audio renders, and document retrieval steps for QA leads.
+3. **Sampler Asset S3 Mirroring (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders plus LUFS metadata into the secure S3 bucket, then update the listening notes with the cloud artifact pointers for remote QA teams.
+
 # Session Summary (Step 7 Tracker Grid & Loudness Widgets – GUI/UX Implementation)
 - Re-read README §7 plus the Step 7 kickoff doc to confirm the tracker-grid,
   loudness, and preview-loop deliverables before landing new widgets (Plan
