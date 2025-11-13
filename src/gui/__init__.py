@@ -4,6 +4,11 @@ from .app import TrackerMixerApp, TrackerMixerRoot
 from .mixer_board import MixerBoardAdapter, MixerStripState, MixerStripWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
 from .state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
+from .tracker_panel import (
+    LoudnessTableWidget,
+    TrackerGridWidget,
+    TrackerPanelController,
+)
 
 __all__ = [
     "TrackerMixerApp",
@@ -16,4 +21,7 @@ __all__ = [
     "TrackerPanelState",
     "MixerPanelState",
     "TrackerMixerLayoutState",
+    "TrackerGridWidget",
+    "LoudnessTableWidget",
+    "TrackerPanelController",
 ]

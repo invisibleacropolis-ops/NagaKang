@@ -11,6 +11,12 @@ This note records the first deliverables for Plan §7 (GUI/UX Implementation wit
 - `src/gui/app.py` introduces `TrackerMixerApp` and `TrackerMixerRoot`. The root widget polls a `PreviewOrchestrator`, stores the latest `TrackerMixerLayoutState`, and exposes the object via `layout_state` for downstream Kivy bindings.
 - The shell guards all Kivy imports with documented fallbacks so CI and headless developer environments can import the package without installing GPU-heavy dependencies.
 
+## Tracker Panel Widgets & Controller
+- `src/gui/tracker_panel.py` adds `TrackerGridWidget` and `LoudnessTableWidget`. Both widgets accept a `TrackerPanelState` via `apply_state(...)` so KV contributors can hydrate pattern metadata, pending preview queue entries, and loudness analytics without touching backend types.
+- `TrackerGridWidget.select_step(...)` mirrors tracker gestures back into the preview pipeline via `TrackerPanelController`, updating the `selected_step` property so multi-touch bindings can surface focus/selection affordances.
+- `TrackerPanelController` wraps `MutationPreviewService` and builds ephemeral `StepMutation` records for selection previews. The controller takes a configurable `selection_window_steps` window to match tracker resolution, calls `PatternEditor.step_to_beat(...)` helpers for timing, and enqueues the resulting playback request automatically.
+- `LoudnessTableWidget` mirrors `TrackerPanelState.loudness_rows`, enabling doc/test instrumentation of the beat-wise LUFS grades required by Plan §7 and the README loudness milestone.
+
 ## Preview Orchestration
 - `src/gui/preview.py` wraps `tracker.playback_worker.PlaybackWorker` with a `PreviewOrchestrator` that:
   - Drains pending pattern preview requests and mirrors the tracker queue state for UI summaries.
