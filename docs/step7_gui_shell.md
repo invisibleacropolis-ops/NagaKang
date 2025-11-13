@@ -1,0 +1,34 @@
+# Step 7 GUI/UX Shell Kickoff
+
+This note records the first deliverables for Plan §7 (GUI/UX Implementation with Kivy) and links the code scaffolding that now lives in `src/gui/`. The goal is to provide a documented, testable shell before higher-fidelity widgets land.
+
+## Objectives Recap
+- Confirmed Step 6 prerequisites and mixer telemetry coverage via README §6–§7 review before wiring the GUI shell.
+- Stood up a preview orchestration layer that consumes the existing tracker playback worker plus Step 6 mixer adapters.
+- Defined widget contracts so external Kivy contributors can bind real layouts without spelunking through audio code.
+
+## Application Shell
+- `src/gui/app.py` introduces `TrackerMixerApp` and `TrackerMixerRoot`. The root widget polls a `PreviewOrchestrator`, stores the latest `TrackerMixerLayoutState`, and exposes the object via `layout_state` for downstream Kivy bindings.
+- The shell guards all Kivy imports with documented fallbacks so CI and headless developer environments can import the package without installing GPU-heavy dependencies.
+
+## Preview Orchestration
+- `src/gui/preview.py` wraps `tracker.playback_worker.PlaybackWorker` with a `PreviewOrchestrator` that:
+  - Drains pending pattern preview requests and mirrors the tracker queue state for UI summaries.
+  - Optionally delegates loudness table generation to `PatternPerformanceBridge.tracker_loudness_rows` (or any callable) per Plan §7 meter/visualisation requirements.
+  - Hydrates mixer strip state via the shared `MixerBoardAdapter`, ensuring the tracker screen and mixer panel are synchronized with the same render batch.
+- `PreviewBatchState` captures both the `TrackerMixerLayoutState` (for widgets) and raw `PreviewRender` objects (for logging/QA overlays) so future UI instrumentation has full fidelity.
+
+## Widget & State Contracts
+- `src/gui/state.py` defines dataclasses (`TrackerPanelState`, `MixerPanelState`, `TrackerMixerLayoutState`) that describe what each panel expects. External contributors can treat these as stable contracts when creating KV templates.
+- `src/gui/mixer_board.py` promotes the MixerGraph → strip adapter from the Step 6 mock into production code, including:
+  - `MixerStripState` plain-data records for strip hydration.
+  - `MixerStripWidget` placeholder that documents the properties/gestures widgets must implement.
+  - `MixerBoardAdapter` helpers for binding channel/return strips, reordering inserts, and pulling master meters for dashboard widgets.
+
+## Next UI Tasks
+1. Flesh out tracker-side widgets (grid, loudness table, transport) that consume `TrackerPanelState`.
+2. Bind return/insert gestures in KV language, referencing the adapter helpers documented above.
+3. Thread tutorial/tooltips copy from Step 1 UX docs into the new shell once widgets render live audio previews.
+
+## Update History
+- 2025-11-21 – Initial scaffolding capturing the preview orchestrator, layout state contracts, and mixer adapter promotion for Step 7 kickoff.

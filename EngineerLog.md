@@ -1,3 +1,27 @@
+# Session Summary (Step 7 GUI Shell Kickoff – GUI/UX Implementation)
+- Re-read README §7 against the completed Step 6 artifacts to confirm prerequisites before landing the first GUI scaffolding.
+  (Step 7 readiness verification: ~0% ➜ ~5%.)
+- Promoted the mixer mock adapter into `src/gui/` with production-ready dataclasses, widgets, and layout state that hydrate the
+  tracker/mixer shell directly from `MixerGraph` snapshots. (Step 7 scaffolding completion: ~0% ➜ ~12%.)
+- Implemented `PreviewOrchestrator`, `TrackerMixerApp`, and integration tests so the tracker preview worker, loudness tables,
+  and mixer telemetry stream into a documented `TrackerMixerLayoutState` for UI engineers. (Step 7 orchestration completion:
+  ~0% ➜ ~10%.)
+- Authored `docs/step7_gui_shell.md` to document widget contracts, loudness hooks, and forthcoming Kivy tasks so external
+  engineers can continue the Plan §7 workstream without spelunking through backend code. (Step 7 documentation completion:
+  ~0% ➜ ~15%.)
+- Ran `poetry run pytest` to exercise the new GUI orchestrator tests alongside the existing audio/tracker suites.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 7 Tracker Grid & Loudness Widgets (~12% ➜ ~20%)**
+   - Build Kivy tracker grid/loudness table widgets that consume `TrackerPanelState`, sync selection gestures back to the preview
+     queue, and capture screenshots for docs.
+2. **CI Mixer Trend Artifacts Integration (~96% ➜ 100%)**
+   - Thread `tools/mixer_diagnostics.py --compare` exports into CI, persist trend snapshots beside audio renders, and document
+     retrieval steps for QA leads.
+3. **Sampler Asset S3 Mirroring (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders plus LUFS metadata into the secure S3 bucket, then update the listening notes
+     with the cloud artifact pointers for remote QA teams.
+
 # Session Summary (Step 1–6 Verification & Mixer Closure – Effects & Routing)
 - Reviewed the Comprehensive Development Plan (README §§1–6) and cross-checked
   each milestone against the shipped artifacts (`docs/step1_*` ➜
