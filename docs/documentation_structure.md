@@ -11,6 +11,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step3_pattern_bridge_walkthrough.md` – Pattern bridge flow showing sampler layering, beat loudness tables, and CLI usage for rehearsal prep.
 - `docs/step6_mixer_kickoff.md` – Effects/routing kickoff documenting mixer graph primitives, auxiliary routing tests, and Kivy layout strategy per Plan §6.
 - `docs/step6_mixer_kivy_mock.py` – Prototype MixerGraph → Kivy adapter illustrating strip state binding, subgroup metering, return-bus presets, and insert reordering affordances.
+- `docs/step7_gui_shell.md` – Step 7 kickoff covering the preview orchestrator, tracker/mixer layout contracts, and widget bindings promoted from the mock into production.
 - `tools/mixer_diagnostics.py` – CLI for rendering the Step 6 demo graph, exporting subgroup meters, return levels, and mixer automation events for QA.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
 - `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
