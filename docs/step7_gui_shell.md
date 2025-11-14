@@ -9,6 +9,7 @@ This note records the first deliverables for Plan §7 (GUI/UX Implementation wit
 
 ## Application Shell
 - `src/gui/app.py` introduces `TrackerMixerApp` and `TrackerMixerRoot`. The root widget polls a `PreviewOrchestrator`, stores the latest `TrackerMixerLayoutState`, and exposes the object via `layout_state` for downstream Kivy bindings.
+- `TrackerMixerRoot` now instantiates `TransportControlsWidget`, `TrackerGridWidget`, and `LoudnessTableWidget` by default so orchestration demos show live data without requiring KV templates. Passing a `TrackerPanelController` into `TrackerMixerApp` automatically binds the transport and grid gestures to the preview queue, which keeps Step 7 transport actions aligned with the Step 4 playback worker.
 - The shell guards all Kivy imports with documented fallbacks so CI and headless developer environments can import the package without installing GPU-heavy dependencies.
 
 ## Tracker Panel Widgets & Controller
@@ -24,6 +25,28 @@ This note records the first deliverables for Plan §7 (GUI/UX Implementation wit
   - Optionally delegates loudness table generation to `PatternPerformanceBridge.tracker_loudness_rows` (or any callable) per Plan §7 meter/visualisation requirements.
   - Hydrates mixer strip state via the shared `MixerBoardAdapter`, ensuring the tracker screen and mixer panel are synchronized with the same render batch.
 - `PreviewBatchState` captures both the `TrackerMixerLayoutState` (for widgets) and raw `PreviewRender` objects (for logging/QA overlays) so future UI instrumentation has full fidelity.
+- The orchestrator now exposes `tempo_bpm`, transport playback status, loop-window defaults, and tutorial copy alongside tracker summaries. Callers can override these via the constructor parameters (`tempo_bpm`, `loop_window_steps`, `tutorial_tips`) to keep Step 1 onboarding copy and rehearsal tempos consistent across demos.
+
+### Loop-Length KV Binding Example
+
+The loop-length control is intentionally stored on `TransportControlsWidget.loop_window_steps` so KV authors can bind sliders or steppers directly. A minimal binding looks like:
+
+```kv
+#:kivy 2.3.0
+<TransportControlsRow@BoxLayout>:
+    orientation: "horizontal"
+    TransportControlsWidget:
+        id: transport
+        on_stop: transport.stop_playback()
+    Slider:
+        min: 1
+        max: 32
+        value: transport.loop_window_steps
+        step: 1
+        on_value: transport.loop_window_steps = int(self.value)
+```
+
+This keeps loop audition gestures in sync with the tracker queue without duplicating controller logic. Real layouts can wrap the slider with labeled buttons/tooltips referencing `transport.onboarding_hint` for the Step 1 tutorial text.
 
 ## Widget & State Contracts
 - `src/gui/state.py` defines dataclasses (`TrackerPanelState`, `MixerPanelState`, `TrackerMixerLayoutState`) that describe what each panel expects. External contributors can treat these as stable contracts when creating KV templates. `TrackerPanelState` now exposes tempo, `is_playing`, `loop_window_steps`, and `tutorial_tips` so transport widgets can echo the Step 1 UX copy and telemetry.
@@ -40,3 +63,4 @@ This note records the first deliverables for Plan §7 (GUI/UX Implementation wit
 ## Update History
 - 2025-11-21 – Initial scaffolding capturing the preview orchestrator, layout state contracts, and mixer adapter promotion for Step 7 kickoff.
 - 2025-11-22 – Added transport controls, tutorial tooltips sourced from Step 1 UX flows, and loop preview helpers binding the tracker shell to `TrackerPanelController`.
+- 2025-11-23 – Threaded transport widgets directly into `TrackerMixerApp`, added tempo/tutorial parameters to `PreviewOrchestrator`, and documented the KV loop-length binding strategy.

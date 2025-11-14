@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from audio.engine import EngineConfig, TempoMap
 from audio.mixer import MixerChannel, MixerGraph
 from audio.modules import SineOscillator
@@ -9,6 +11,7 @@ from gui.app import TrackerMixerRoot
 from gui.mixer_board import MixerBoardAdapter
 from gui.preview import PreviewBatchState, PreviewOrchestrator
 from gui.state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
+from gui.tracker_panel import TrackerPanelController
 from tracker.pattern_editor import PatternEditor
 from tracker.preview_service import MutationPreviewService
 from tracker.playback_worker import PlaybackWorker
@@ -60,6 +63,9 @@ def test_preview_orchestrator_emits_layout_state() -> None:
         loudness_provider=lambda playback, beats: bridge.tracker_loudness_rows(
             playback, beats_per_bucket=beats
         ),
+        tempo_bpm=tempo.tempo_bpm,
+        loop_window_steps=8.0,
+        tutorial_tips=["Custom tip", "Secondary hint"],
     )
 
     batch = orchestrator.process_pending()
@@ -69,13 +75,32 @@ def test_preview_orchestrator_emits_layout_state() -> None:
     assert layout.tracker.pattern_id == pattern.id
     assert layout.tracker.pending_requests, "Tracker summary should describe processed mutation"
     assert layout.tracker.loudness_rows, "Loudness rows should be generated via the bridge helper"
+    assert layout.tracker.tempo_bpm == pytest.approx(tempo.tempo_bpm)
+    assert layout.tracker.loop_window_steps == pytest.approx(8.0)
+    assert layout.tracker.tutorial_tips[0] == "Custom tip"
     assert "lead" in layout.mixer.strip_states
     assert layout.mixer.master_meter is not None
 
 
 def test_tracker_mixer_root_binds_orchestrator() -> None:
+    pattern = Pattern(
+        id="pattern_B",
+        name="Pattern B",
+        length_steps=8,
+        steps=[PatternStep() for _ in range(8)],
+    )
+    editor = PatternEditor(pattern)
+    editor.set_step(0, note=64, velocity=90, instrument_id="lead")
+    service = MutationPreviewService(editor)
+    controller = TrackerPanelController(service)
+    tracker_state = TrackerPanelState(
+        pattern_id=pattern.id,
+        tempo_bpm=140.0,
+        loop_window_steps=2.0,
+        tutorial_tips=["Loop the intro fill"],
+    )
     layout = TrackerMixerLayoutState(
-        tracker=TrackerPanelState(pattern_id="pattern_A"),
+        tracker=tracker_state,
         mixer=MixerPanelState(),
     )
     batch = PreviewBatchState(layout=layout, previews=[])
@@ -89,10 +114,19 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
             return batch
 
     orchestrator = DummyOrchestrator()
-    root = TrackerMixerRoot()
+    root = TrackerMixerRoot(tracker_controller=controller)
     root.bind_orchestrator(orchestrator, interval=0.0)
 
     root._poll_orchestrator()
 
     assert root.layout_state is layout
     assert orchestrator.calls == 1
+    assert root.transport_controls.loop_window_steps == pytest.approx(2.0)
+    assert root.tracker_grid.pattern_id == pattern.id
+    assert not service.queue
+
+    playback_requests = root.transport_controls.start_playback()
+
+    assert playback_requests, "Transport start should enqueue loop previews"
+    assert len(service.queue) == len(playback_requests)
+    assert root.transport_controls.is_playing is True
