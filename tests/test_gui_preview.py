@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+import pytest
+
 from audio.engine import EngineConfig, TempoMap
 from audio.mixer import MixerChannel, MixerGraph
 from audio.modules import SineOscillator

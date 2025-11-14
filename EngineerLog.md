@@ -1,3 +1,19 @@
+# Session Summary (Step 7 Transport Strip Polish & KV Demo Wiring – GUI/UX Implementation)
+- Re-read the Comprehensive Development Plan (README §7 plus the Step 1 onboarding guidance) to verify the transport/tutorial polish scope before editing widgets or docs. (Plan verification: ~14% ➜ ~16%.)
+- Extended `TransportControlsWidget` with tutorial tip rotation, loop-window clamping, and optional window overrides so TrackerMixerApp demos can bind play/stop/loop toggles without rewriting preview logic. (Step 7 transport polish completion: ~35% ➜ 100%.)
+- Added annotated transport strip assets plus KV binding examples to `docs/step7_gui_shell.md`/`docs/documentation_structure.md`, giving external GUI engineers copy-ready snippets and onboarding callouts for the play/stop/loop controls. (Step 7 documentation completion: ~36% ➜ ~44%.)
+- Expanded `tests/test_gui_tracker_panel.py`/`tests/test_gui_preview.py` to cover the new transport helpers and orchestrator parameters so regression coverage keeps pace with the Step 7 polish. (Step 7 regression coverage: ~28% ➜ ~34%.)
+- Captured `docs/assets/ui/transport_strip_annotations.svg` to satisfy the transport screenshot requirement and keep KV authors aligned with the new widget affordances.
+- Ran `poetry run pytest` to validate the GUI/test additions against the full suite.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 7 Layout Stress & Mixer Dock Wiring (~36% ➜ 45%)**
+   - Thread the tracker grid + transport shell into the mixer board mock, capture latency notes for the three-panel layout, and document any layout constraints before sharing with Kivy contributors.
+2. **CI Mixer Trend Artifacts Integration (~96% ➜ 100%)**
+   - Thread `tools/mixer_diagnostics.py --compare` exports into CI, persist trend snapshots beside audio renders, and document retrieval steps for QA leads.
+3. **Sampler Asset S3 Mirroring (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders plus LUFS metadata into the secure S3 bucket, then update the listening notes with the cloud artifact pointers for remote QA teams.
+
 # Session Summary (Step 7 Transport Widget Integration – GUI/UX Implementation)
 - Re-read README §7 plus Step 1 onboarding guidance to confirm transport/tutorial scope before touching widgets (Plan verification: ~11% ➜ ~14%).
 - Extended `TrackerMixerRoot`/`TrackerMixerApp` so transport, tracker grid, and loudness widgets are instantiated and controller-bound automatically, ensuring Step 7 demos show live transport data without KV boilerplate. (Step 7 tracker widget completion: ~28% ➜ ~35%.)
@@ -1190,4 +1206,3 @@
      contract, introduce subgroup/solo scaffolding inside
      `audio.mixer.MixerGraph`, and begin wiring the Kivy mixer mock to
      the new channel/bus APIs.
-

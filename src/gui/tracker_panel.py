@@ -86,6 +86,7 @@ class TransportControlsWidget(BoxLayout):
     loop_window_steps = NumericProperty(16.0)
     tutorial_tips = ListProperty([])
     onboarding_hint = StringProperty("")
+    tutorial_tip_index = NumericProperty(0)
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -98,15 +99,28 @@ class TransportControlsWidget(BoxLayout):
         self.tempo_bpm = float(state.tempo_bpm)
         self.is_playing = bool(state.is_playing)
         self.loop_window_steps = float(state.loop_window_steps)
-        self.tutorial_tips = list(state.tutorial_tips)
-        self.onboarding_hint = state.tutorial_tips[0] if state.tutorial_tips else ""
+        incoming_tips = list(state.tutorial_tips)
+        previous_tips = list(self.tutorial_tips)
+        self.tutorial_tips = incoming_tips
+        if incoming_tips != previous_tips:
+            self.tutorial_tip_index = 0
+        self._sync_onboarding_hint()
 
-    def start_playback(self, *, start_step: int = 0) -> List[PlaybackRequest]:
+    def start_playback(
+        self,
+        *,
+        start_step: int = 0,
+        window_steps: float | None = None,
+    ) -> List[PlaybackRequest]:
         if self._controller is None:
             return []
+        if window_steps is None:
+            window_steps = self.loop_window_steps
+        if window_steps <= 0:
+            raise ValueError("window_steps must be positive")
         requests = self._controller.preview_loop(
             start_step=start_step,
-            window_steps=self.loop_window_steps,
+            window_steps=window_steps,
         )
         if requests:
             self.is_playing = True
@@ -117,6 +131,36 @@ class TransportControlsWidget(BoxLayout):
             return
         self._controller.stop_preview()
         self.is_playing = False
+
+    def set_loop_window_steps(self, steps: float) -> float:
+        """Utility helper for slider bindings that clamps loop window input."""
+
+        if steps <= 0:
+            raise ValueError("loop window must be positive")
+        self.loop_window_steps = float(steps)
+        return self.loop_window_steps
+
+    def advance_tutorial_hint(self) -> str:
+        """Rotate through Step 1 onboarding tips for annotated demos."""
+
+        tips = list(self.tutorial_tips)
+        if not tips:
+            self.onboarding_hint = ""
+            return self.onboarding_hint
+        self.tutorial_tip_index = (int(self.tutorial_tip_index) + 1) % len(tips)
+        self._sync_onboarding_hint()
+        return self.onboarding_hint
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _sync_onboarding_hint(self) -> None:
+        tips = list(self.tutorial_tips)
+        if not tips:
+            self.onboarding_hint = ""
+            return
+        index = int(self.tutorial_tip_index) % len(tips)
+        self.onboarding_hint = tips[index]
 
 
 class TrackerPanelController:

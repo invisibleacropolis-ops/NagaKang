@@ -13,7 +13,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step6_mixer_kivy_mock.py` – Prototype MixerGraph → Kivy adapter illustrating strip state binding, subgroup metering, return-bus presets, and insert reordering affordances.
 - `docs/step7_gui_shell.md` – Step 7 kickoff covering the preview orchestrator, tracker/mixer layout contracts, tracker grid & loudness widgets, transport/tutorial bindings, and widget adapters promoted from the mock into production.
 - `tools/mixer_diagnostics.py` – CLI for rendering the Step 6 demo graph, exporting subgroup meters, return levels, and mixer automation events for QA.
-- `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals.
+- `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals. UI captures such as `docs/assets/ui/transport_strip_annotations.svg` document Step 7 bindings for external designers.
 - `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
 - `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.
 - `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.

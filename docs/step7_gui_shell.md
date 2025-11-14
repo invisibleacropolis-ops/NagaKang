@@ -48,6 +48,41 @@ The loop-length control is intentionally stored on `TransportControlsWidget.loop
 
 This keeps loop audition gestures in sync with the tracker queue without duplicating controller logic. Real layouts can wrap the slider with labeled buttons/tooltips referencing `transport.onboarding_hint` for the Step 1 tutorial text.
 
+### Transport Strip Tutorial Polish
+
+To keep Step 1 onboarding copy front-and-center we added `TransportControlsWidget.tutorial_tip_index` plus `advance_tutorial_hint()` for callouts and annotated demos. The widget now clamps slider/stepper input via `set_loop_window_steps(...)` so KV bindings cannot accidentally pass invalid values into the preview worker. The annotated mock below shows how the new helpers line up with the Plan §7 transport deliverables:
+
+![Annotated transport controls strip with onboarding hint callouts](assets/ui/transport_strip_annotations.svg)
+
+The following snippet demonstrates the recommended bindings for TrackerMixerApp demos. The `Play`, `Stop`, and `Next Tip` buttons simply proxy into the widget helpers, keeping the logic testable and aligned with the regression suite:
+
+```kv
+#:kivy 2.3.0
+<TransportStrip@BoxLayout>:
+    spacing: 12
+    TransportControlsWidget:
+        id: transport
+    BoxLayout:
+        size_hint_x: 0.6
+        spacing: 8
+        Button:
+            text: "Play"
+            on_press: transport.start_playback()
+        Button:
+            text: "Stop"
+            on_press: transport.stop_playback()
+        Button:
+            text: "Next Tip"
+            on_press: transport.advance_tutorial_hint()
+        Slider:
+            min: 1
+            max: 32
+            value: transport.loop_window_steps
+            on_value: transport.set_loop_window_steps(self.value)
+```
+
+Binding these helpers directly ensures the TrackerMixerApp shell stays declarative while honoring the Step 1 onboarding narrative and transport polish targets captured in the README and EngineerLog.
+
 ## Widget & State Contracts
 - `src/gui/state.py` defines dataclasses (`TrackerPanelState`, `MixerPanelState`, `TrackerMixerLayoutState`) that describe what each panel expects. External contributors can treat these as stable contracts when creating KV templates. `TrackerPanelState` now exposes tempo, `is_playing`, `loop_window_steps`, and `tutorial_tips` so transport widgets can echo the Step 1 UX copy and telemetry.
 - `src/gui/mixer_board.py` promotes the MixerGraph → strip adapter from the Step 6 mock into production code, including:

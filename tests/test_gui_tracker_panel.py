@@ -116,6 +116,44 @@ def test_transport_widget_binds_state_and_controls_preview() -> None:
     assert len(service.queue) == 0
 
 
+def test_transport_widget_cycles_tutorial_hints_and_loop_window() -> None:
+    pattern = build_pattern()
+    editor = PatternEditor(pattern)
+    editor.set_step(0, note=60, velocity=90, instrument_id="lead")
+    editor.set_step(1, note=62, velocity=100, instrument_id="lead")
+    service = MutationPreviewService(editor)
+    controller = TrackerPanelController(service)
+
+    state = TrackerPanelState(
+        pattern_id=pattern.id,
+        tempo_bpm=128.0,
+        loop_window_steps=2.0,
+        tutorial_tips=["Tap", "Loop", "Record"],
+    )
+
+    widget = TransportControlsWidget()
+    widget.bind_controller(controller)
+    widget.apply_state(state)
+
+    first_hint = widget.onboarding_hint
+    second_hint = widget.advance_tutorial_hint()
+    third_hint = widget.advance_tutorial_hint()
+
+    assert first_hint == "Tap"
+    assert second_hint == "Loop"
+    assert third_hint == "Record"
+    assert widget.advance_tutorial_hint() == "Tap"
+
+    widget.set_loop_window_steps(1.0)
+
+    requests = widget.start_playback(window_steps=1.0)
+
+    assert len(requests) == 1
+    assert widget.is_playing is True
+
+    with pytest.raises(ValueError):
+        widget.start_playback(window_steps=0)
+
 def test_controller_preview_loop_respects_window() -> None:
     pattern = build_pattern()
     editor = PatternEditor(pattern)
