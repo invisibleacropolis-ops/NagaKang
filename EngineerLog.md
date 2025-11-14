@@ -1,3 +1,19 @@
+# Session Summary (Step 7 Transport Widget Integration – GUI/UX Implementation)
+- Re-read README §7 plus Step 1 onboarding guidance to confirm transport/tutorial scope before touching widgets (Plan verification: ~11% ➜ ~14%).
+- Extended `TrackerMixerRoot`/`TrackerMixerApp` so transport, tracker grid, and loudness widgets are instantiated and controller-bound automatically, ensuring Step 7 demos show live transport data without KV boilerplate. (Step 7 tracker widget completion: ~28% ➜ ~35%.)
+- Updated `PreviewOrchestrator` to emit tempo, loop-window, and tutorial copy (w/ configurable defaults) so `TrackerPanelState` surfaces the Step 1 onboarding hints for UI bindings. (Step 7 transport scaffolding completion: ~35% ➜ ~44%.)
+- Documented the new app wiring and loop-length slider binding strategy in `docs/step7_gui_shell.md`, keeping external GUI engineers aligned with the updated transport contracts. (Step 7 documentation completion: ~30% ➜ ~36%.)
+- Expanded `tests/test_gui_preview.py` to cover the orchestrator parameters plus the controller-bound transport widget, ensuring regressions are caught automatically. (Step 7 regression coverage: ~22% ➜ ~28%.)
+- Ran `poetry run pytest` to validate the GUI/orchestrator suite alongside the rest of the project.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 7 Transport & Tutorial Polish (~35% ➜ ~42%)**
+   - Capture annotated screenshots of the integrated transport strip (with onboarding hint callouts) and script the remaining KV bindings for play/stop/loop toggles inside `TrackerMixerApp` demos.
+2. **CI Mixer Trend Artifacts Integration (~96% ➜ 100%)**
+   - Thread `tools/mixer_diagnostics.py --compare` exports into CI, persist trend snapshots beside audio renders, and document retrieval steps for QA leads.
+3. **Sampler Asset S3 Mirroring (~99% ➜ 100%)**
+   - Mirror the choir swell and gospel stab renders plus LUFS metadata into the secure S3 bucket, then update the listening notes with the cloud artifact pointers for remote QA teams.
+
 # Session Summary (Step 7 Transport & Tutorial Widgets – GUI/UX Implementation)
 - Re-read README §7 plus the Step 1 UX flows to confirm the transport, onboarding copy, and loop-audition scope before adding new widgets (Plan verification: ~8% ➜ ~11%).
 - Extended `src/gui/state.py` with tempo/transport/tutorial fields so tracker widgets can mirror Step 1 onboarding text and play-state telemetry inside `TrackerMixerLayoutState`. (Step 7 tracker widget completion: ~20% ➜ ~28%.)

@@ -13,6 +13,11 @@ from .state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
 
 LoudnessProvider = Callable[[PatternPlayback, float], List[Dict[str, object]]]
 
+DEFAULT_TUTORIAL_TIPS = [
+    "Tap the tracker grid to audition steps in place.",
+    "Use loop markers to focus on a tricky fill before recording it live.",
+]
+
 
 @dataclass
 class PreviewBatchState:
@@ -32,13 +37,23 @@ class PreviewOrchestrator:
         mixer_adapter: MixerBoardAdapter,
         beats_per_bucket: float = 1.0,
         loudness_provider: LoudnessProvider | None = None,
+        tempo_bpm: float = 120.0,
+        loop_window_steps: float = 16.0,
+        tutorial_tips: Sequence[str] | None = None,
     ) -> None:
         if beats_per_bucket <= 0.0:
             raise ValueError("beats_per_bucket must be positive")
+        if loop_window_steps <= 0.0:
+            raise ValueError("loop_window_steps must be positive")
+        if tempo_bpm <= 0.0:
+            raise ValueError("tempo_bpm must be positive")
         self._worker = worker
         self._adapter = mixer_adapter
         self._beats_per_bucket = float(beats_per_bucket)
         self._loudness_provider = loudness_provider
+        self._tempo_bpm = float(tempo_bpm)
+        self._loop_window_steps = float(loop_window_steps)
+        self._tutorial_tips = list(tutorial_tips or DEFAULT_TUTORIAL_TIPS)
 
     @property
     def beats_per_bucket(self) -> float:
@@ -72,6 +87,10 @@ class PreviewOrchestrator:
             pending_requests=pending,
             last_preview_summary=summary,
             loudness_rows=loudness_rows,
+            tempo_bpm=self._tempo_bpm,
+            is_playing=bool(previews),
+            loop_window_steps=self._loop_window_steps,
+            tutorial_tips=list(self._tutorial_tips),
         )
 
     def _mixer_state(self) -> MixerPanelState:

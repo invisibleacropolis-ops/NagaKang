@@ -5,6 +5,12 @@ from typing import Any
 
 from .preview import PreviewBatchState, PreviewOrchestrator
 from .state import TrackerMixerLayoutState
+from .tracker_panel import (
+    LoudnessTableWidget,
+    TrackerGridWidget,
+    TrackerPanelController,
+    TransportControlsWidget,
+)
 
 try:  # pragma: no cover - optional dependency for headless CI
     from kivy.app import App
@@ -28,19 +34,51 @@ except Exception:  # pragma: no cover - fallback for non-GUI environments
         return default
 
     class BoxLayout:  # type: ignore
-        def __init__(self, **_kwargs) -> None:
-            pass
+        def __init__(self, **kwargs) -> None:
+            self.children = []
+            self.orientation = kwargs.get("orientation", "horizontal")
+
+        def add_widget(self, widget) -> None:  # pragma: no cover - stub helper
+            self.children.append(widget)
 
 
 class TrackerMixerRoot(BoxLayout):
     """Top-level widget that polls the orchestrator and exposes layout state."""
 
     layout_state = ObjectProperty(None)
+    tracker_grid = ObjectProperty(None)
+    loudness_table = ObjectProperty(None)
+    transport_controls = ObjectProperty(None)
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, tracker_controller: TrackerPanelController | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._orchestrator: PreviewOrchestrator | None = None
         self._clock_event = None
+        self._tracker_controller: TrackerPanelController | None = None
+        self._build_default_children()
+        if tracker_controller is not None:
+            self.bind_tracker_controller(tracker_controller)
+
+    def _build_default_children(self) -> None:
+        """Instantiate tracker-side widgets so demos run without KV layouts."""
+
+        if getattr(self, "orientation", None) is None:
+            self.orientation = "vertical"
+        self.transport_controls = TransportControlsWidget()
+        self.tracker_grid = TrackerGridWidget()
+        self.loudness_table = LoudnessTableWidget()
+        self.add_widget(self.transport_controls)
+        self.add_widget(self.tracker_grid)
+        self.add_widget(self.loudness_table)
+
+    def bind_tracker_controller(self, controller: TrackerPanelController) -> None:
+        """Wire controller gestures into the tracker widgets."""
+
+        self._tracker_controller = controller
+        if self.transport_controls is not None:
+            self.transport_controls.bind_controller(controller)
+        if self.tracker_grid is not None:
+            self.tracker_grid.bind_controller(controller)
 
     def bind_orchestrator(self, orchestrator: PreviewOrchestrator, *, interval: float = 0.5) -> None:
         self._orchestrator = orchestrator
@@ -55,17 +93,31 @@ class TrackerMixerRoot(BoxLayout):
 
     def _apply_batch(self, batch: PreviewBatchState) -> None:
         self.layout_state = batch.layout
+        tracker_state = batch.layout.tracker
+        if self.transport_controls is not None:
+            self.transport_controls.apply_state(tracker_state)
+        if self.tracker_grid is not None:
+            self.tracker_grid.apply_state(tracker_state)
+        if self.loudness_table is not None:
+            self.loudness_table.apply_state(tracker_state)
 
 
 class TrackerMixerApp(App):
     """Minimal App wrapper suitable for instrumentation and manual demos."""
 
-    def __init__(self, orchestrator: PreviewOrchestrator, **kwargs) -> None:
+    def __init__(
+        self,
+        orchestrator: PreviewOrchestrator,
+        *,
+        tracker_controller: TrackerPanelController | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._orchestrator = orchestrator
+        self._tracker_controller = tracker_controller
 
     def build(self) -> TrackerMixerRoot:
-        root = TrackerMixerRoot()
+        root = TrackerMixerRoot(tracker_controller=self._tracker_controller)
         root.bind_orchestrator(self._orchestrator)
         return root
 
