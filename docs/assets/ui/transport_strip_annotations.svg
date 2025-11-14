@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="320" viewBox="0 0 800 320" role="img" aria-labelledby="title desc">
+  <title id="title">Tracker transport strip mock with annotations</title>
+  <desc id="desc">Diagram showing play, stop, loop length slider, and onboarding hint badge for Step 7 transport polish.</desc>
+  <rect width="800" height="320" fill="#10151c" rx="24" />
+  <rect x="40" y="60" width="720" height="80" fill="#1f2a36" rx="16" stroke="#4fb0ff" stroke-width="2" />
+  <text x="60" y="110" fill="#ffffff" font-size="28" font-family="Helvetica, Arial, sans-serif">TransportControlsWidget</text>
+  <rect x="60" y="80" width="90" height="40" fill="#2d974c" rx="8" />
+  <text x="75" y="105" fill="#ffffff" font-size="18" font-family="Helvetica, Arial, sans-serif">Play</text>
+  <rect x="160" y="80" width="90" height="40" fill="#c94d50" rx="8" />
+  <text x="182" y="105" fill="#ffffff" font-size="18" font-family="Helvetica, Arial, sans-serif">Stop</text>
+  <rect x="270" y="80" width="260" height="40" fill="#273447" rx="8" stroke="#7ec8ff" stroke-dasharray="6 6" />
+  <text x="290" y="105" fill="#ffffff" font-size="18" font-family="Helvetica, Arial, sans-serif">Loop length slider (steps)</text>
+  <rect x="550" y="80" width="190" height="40" fill="#f5c04f" rx="8" />
+  <text x="565" y="105" fill="#121212" font-size="18" font-family="Helvetica, Arial, sans-serif">Onboarding hint</text>
+  <rect x="60" y="180" width="320" height="40" fill="#2f3948" rx="8" />
+  <text x="70" y="205" fill="#ffffff" font-size="16" font-family="Helvetica, Arial, sans-serif">advance_tutorial_hint() → rotates Step 1 tips</text>
+  <rect x="60" y="230" width="320" height="40" fill="#2f3948" rx="8" />
+  <text x="70" y="255" fill="#ffffff" font-size="16" font-family="Helvetica, Arial, sans-serif">set_loop_window_steps(value) clamps slider input</text>
+  <rect x="400" y="180" width="360" height="40" fill="#2f3948" rx="8" />
+  <text x="410" y="205" fill="#ffffff" font-size="16" font-family="Helvetica, Arial, sans-serif">start_playback(window_steps=...) reuses preview loop</text>
+  <rect x="400" y="230" width="360" height="40" fill="#2f3948" rx="8" />
+  <text x="410" y="255" fill="#ffffff" font-size="16" font-family="Helvetica, Arial, sans-serif">stop_playback() clears queue and resets meters</text>
+  <line x1="105" y1="150" x2="105" y2="180" stroke="#7ec8ff" stroke-width="3" marker-end="url(#arrow)" />
+  <line x1="195" y1="150" x2="195" y2="180" stroke="#7ec8ff" stroke-width="3" marker-end="url(#arrow)" />
+  <line x1="400" y1="150" x2="400" y2="180" stroke="#7ec8ff" stroke-width="3" marker-end="url(#arrow)" />
+  <line x1="640" y1="150" x2="640" y2="180" stroke="#7ec8ff" stroke-width="3" marker-end="url(#arrow)" />
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7ec8ff" />
+    </marker>
+  </defs>
+</svg>
