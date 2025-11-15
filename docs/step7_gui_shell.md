@@ -134,6 +134,12 @@ The annotated capture above is bundled in `docs/assets/ui/tracker_mixer_three_pa
 
 The pseudo-binding above highlights how KV authors can bridge pointer events to the new helper without reimplementing mixer adapters. Production layouts can replace the simplistic `int(args[1].y // 24)` math with proper list index resolution or gesture recognizers.
 
+## Gesture QA & CI Parity
+
+- Insert gesture coverage lives in `tests/test_gui_mixer_board.py` and `tests/test_gui_preview.py`. The suites drive `MixerDockController`, `MixerInsertGestureModel`, and the tracker/mixer shell to confirm preview/cancel helpers mirror the adapter state exactly before mutating the backend.
+- `tools/mixer_trend_ci.py` now records SHA-256 digests for the Markdown/JSON summaries plus the sampler manifest it references. When previewing layout captures for the docs, pair them with the digests logged in `docs/qa/artifacts/mixer_trends/history/mixer_trend_history.md` so QA can cross-check that GUI demos came from the same render batch.
+- Each time `poetry run pytest` is executed, keep an eye on the GUI-oriented suites noted above—the drag helper intentionally exercises `PreviewOrchestrator` hydration to ensure tracker telemetry and mixer insert previews stay synchronized under load.
+
 ## Three-Panel Tutorial Reference
 
 The refreshed `assets/ui/tracker_mixer_three_panel.svg` now annotates:
@@ -144,13 +150,14 @@ The refreshed `assets/ui/tracker_mixer_three_panel.svg` now annotates:
 
 This single capture replaces the older storyboard so marketing/QA can reuse one asset when explaining tracker tutorials, mixer insert gestures, and the three-panel Step 7 layout stress expectations.
 
-## Next UI Tasks
-1. Flesh out tracker-side widgets (grid, loudness table, transport) that consume `TrackerPanelState`.
-2. Bind return/insert gestures in KV language, referencing the adapter helpers documented above.
-3. Thread tutorial/tooltips copy from Step 1 UX docs into the new shell once widgets render live audio previews.
+## Next Steps (Step 8 Preview)
+1. **Project Manifest Schema (~0% ➜ ~15%)** – Define the JSON schema for tracker patterns, mixer snapshots, and sampler assets, documenting how files are traded between collaborators.
+2. **Import/Export Automation (~0% ➜ ~12%)** – Prototype file-dialog hooks plus helpers that copy samples via sampler-manifest hashes while capturing LUFS metadata and checksums per transfer.
+3. **Autosave & Recovery Notes (~0% ➜ ~10%)** – Outline autosave cadence, crash-recovery checkpoints, and backup naming expectations so persistence features launch with shared requirements.
 
 ## Update History
 - 2025-11-21 – Initial scaffolding capturing the preview orchestrator, layout state contracts, and mixer adapter promotion for Step 7 kickoff.
 - 2025-11-22 – Added transport controls, tutorial tooltips sourced from Step 1 UX flows, and loop preview helpers binding the tracker shell to `TrackerPanelController`.
 - 2025-11-23 – Threaded transport widgets directly into `TrackerMixerApp`, added tempo/tutorial parameters to `PreviewOrchestrator`, and documented the KV loop-length binding strategy.
 - 2025-11-24 – Wired the tracker column into the mixer dock, documented layout stress constraints, and captured mixer trend pointers for CI handoff.
+- 2025-11-25 – Documented insert gesture QA guidance, CI parity checkpoints, and the Step 8 planning hooks that conclude the Step 7 milestone.

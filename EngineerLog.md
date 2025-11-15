@@ -1,3 +1,17 @@
+# Session Summary (Step 7 Documentation Closure & QA Hooks – GUI/UX Implementation)
+- Re-read README §7 plus the mixer trend CI runbook to make sure the remaining Step 7 obligations (gesture documentation, parity notes) were satisfied before editing the docs. (Plan verification: ~22% ➜ ~24%.)
+- Expanded `docs/step7_gui_shell.md` with a "Gesture QA & CI Parity" section, promoted the Step 8 preview tasks into the Next Steps list, and recorded a closure entry in the update history so external engineers have a definitive reference for the finished Step 7 shell. (Step 7 documentation traceability: ~95% ➜ ~100%.)
+- Updated `docs/documentation_structure.md` to mention the new insert-gesture QA guidance so the documentation index surfaces the parity details alongside the Step 7 shell overview. (Documentation index accuracy: ~94% ➜ ~96%.)
+- Ran `poetry run pytest` to reconfirm the GUI, mixer, tracker, and tooling suites remain green with the refreshed documentation guidance. (Regression confidence: ~92% ➜ ~93%.)
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Project Manifest Schema (~0% ➜ ~15%)**
+   - Define the on-disk project manifest (tracker patterns, mixer snapshots, sampler assets) with versioned JSON schemas plus README §8 references so designers can trade projects without reverse-engineering folder layouts.
+2. **Step 8 Import/Export Automation (~0% ➜ ~12%)**
+   - Prototype file-dialog hooks and import/export helpers that copy samples via the sampler manifest hashes, capturing LUFS metadata and checksums alongside each transfer for QA traceability.
+3. **Step 8 Autosave & Recovery Notes (~0% ➜ ~10%)**
+   - Sketch autosave cadence, crash-recovery checkpoints, and backup naming scheme for the tracker/mixer shell so persistence tasks can begin with documented expectations.
+
 # Session Summary (Step 7 Gesture Preview & Artifact Parity Closure – GUI/UX Implementation)
 - Re-read README §7 plus the mixer trend runbook to reconfirm the outstanding
   Step 7 deliverables (insert gestures, tutorial screenshots, CI parity) before
