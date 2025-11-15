@@ -115,6 +115,71 @@ The CLI enforces sampler-manifest parity before copying assets so exported
 bundles inherit the LUFS/checksum metadata already maintained in
 `docs/assets/audio/sampler_s3_manifest.json`.
 
+### Project Import Service & CLI
+
+`src/domain/project_import_service.py` performs the inverse operation. The
+helper validates every manifest entry (patterns, mixer snapshots, sampler
+assets), verifies SHA-256 digests, optionally copies the bundle into a new
+working directory, and exposes a `Project` instance when `project.json` is
+present.
+
+`tools/import_project_bundle.py` wraps the service for QA drills:
+
+```
+poetry run python tools/import_project_bundle.py \
+  --bundle-root dist/projects/demo_bundle \
+  --destination-root projects/imported_demo
+```
+
+The CLI prints a JSON summary containing the manifest digest, asset names, and
+file counts so testers can paste the output directly into rehearsal logs when
+confirming bundle provenance.
+
+### Autosave Stress Harness
+
+`tools/autosave_stress_harness.py` simulates sustained preview batches against
+`TrackerMixerRoot`, exercising the autosave cadence introduced earlier in this
+document. The harness accepts manifest metadata, increments a synthetic time
+source, and emits checkpoint/pruning statistics that QA can store next to their
+bundle notes:
+
+```
+poetry run python tools/autosave_stress_harness.py \
+  --project-id demo \
+  --autosave-dir ./tmp/.autosave \
+  --iterations 12 \
+  --interval-seconds 0.5 \
+  --manifest dist/projects/demo_bundle/project_manifest.json \
+  --asset-count 5
+```
+
+The summary includes the latest recovery prompt so GUI engineers can confirm the
+manifest checksum/asset count surfaced to musicians matches the autosave JSON
+payload.
+
+### QA Hand-off Pack
+
+To keep remote musicians in sync with today’s workflow, pair exported bundles
+with a rehearsal-ready README containing:
+
+1. The CLI commands used to generate/export/import the bundle.
+2. Autosave stress harness output (checkpoints written, pruned count).
+3. A LUFS/canonical hash table sourced from
+   `docs/assets/audio/sampler_s3_manifest.json`:
+
+| Asset | LUFS (LU) | Peak (dBFS) | Manifest SHA-256 |
+| --- | --- | --- | --- |
+| `choir_pad_soft.wav` | -20.6 | -3.1 | `a96353c5bdcc504c` |
+| `strings_vs_choir_blend.wav` | -16.4 | -1.7 | `dbd0c7432f7d5f8c` |
+| `gospel_stab_short.wav` | -15.4 | -4.2 | `eb89270f71c7d2f5` |
+
+4. A checklist reminding testers to:
+   - Run `tools/import_project_bundle.py` and archive the JSON summary.
+   - Launch the tracker shell, confirm the autosave recovery prompt references
+     the manifest digest, and capture a screenshot if QA requires visual proof.
+   - Upload `.autosave/<project_id>` plus the exported manifest copy when filing
+     crash reports so engineering can replay the session verbatim.
+
 ## Autosave & Recovery Outline
 To keep Tracker/Mixer sessions resilient during the Step 8 workstream we will:
 
@@ -165,6 +230,8 @@ autosave prompt ("Autosaved demo at 20251127-153000") via
    can load zipped bundles plus manifests without editing JSON manually.
 
 ## Update History
+- 2025-11-28 – Added the import CLI/service details, autosave stress harness,
+  and QA hand-off checklist for musician testing.
 - 2025-11-27 – Added export service/CLI, import-plan GUI bindings, and autosave
   wiring for the musician testing hand-off.
 - 2025-11-26 – Initial schema, helper references, and autosave expectations for

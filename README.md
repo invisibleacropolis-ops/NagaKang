@@ -100,7 +100,13 @@ this milestone now live in `docs/step8_project_manifest.md` alongside references
 to `src/domain/project_manifest.py`. The accompanying export CLI
 (`tools/export_project_bundle.py`) and GUI autosave hooks described below keep
 the README §8 deliverables actionable for outside engineers preparing bundles
-for QA.
+for QA. The inverse import workflow is now covered by
+`src/domain/project_import_service.py` plus the
+`tools/import_project_bundle.py` CLI, giving testers a checksum-verified path to
+hydrate bundles, copy manifests, and confirm sampler asset parity before
+launching the tracker shell. Reliability drills are supported by
+`tools/autosave_stress_harness.py`, which simulates sustained preview activity
+and reports checkpoint/pruning metrics referenced in the Step 8 QA hand-off pack.
 9. Performance & Quality Assurance
 Establish benchmarking suite (buffer underrun tests, CPU usage profiling).
 Stress harness outputs are catalogued in `docs/qa/audio_engine_benchmarks.md`, linking benchmark evidence back to this Plan §9 milestone.
