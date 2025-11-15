@@ -1384,3 +1384,43 @@
      rehearsal-ready checklist so remote musicians can mirror today’s workflow
      without editor access.
 
+# Session Summary (Step 8 Import Service & Recovery UX – Musician Test Prep)
+- Re-read README §8, `docs/step8_project_manifest.md`, and the Step 7 autosave
+  closure notes before editing code so the remaining persistence items stayed
+  aligned with the musician release candidate. (Plan verification: ~27% ➜ ~28%.)
+- Implemented `src/domain/project_import_service.py`, the
+  `tools/import_project_bundle.py` CLI, and regression suites covering checksum
+  validation plus CLI summaries so exported bundles can now be hydrated and
+  mirrored for QA without manual JSON edits. (Step 8 import service & recovery
+  UX completion: ~48% ➜ ~70%.)
+- Extended `TrackerMixerRoot` autosave prompts with manifest digests, sampler
+  asset counts, and pruning telemetry so GUI testers immediately see which
+  manifest was copied into `.autosave/<project_id>`. Updated the existing GUI
+  regression to assert the new metadata. (Step 8 recovery UX completion: ~58% ➜
+  ~68%.)
+- Authored `tools/autosave_stress_harness.py`, CLI/tests for the stress drill,
+  and README/Step 8 doc updates describing the QA runbook plus LUFS/hash tables
+  for the rehearsal pack. (Step 8 autosave stress harness & QA hand-off
+  completion: ~58% ➜ ~78%.)
+- Documented the import CLI, autosave harness, and QA checklist inside
+  `docs/step8_project_manifest.md`, the documentation index, and README §8 so
+  outside engineers have a single reference when coaching musicians through the
+  new workflow. (Step 8 documentation completion: ~58% ➜ ~74%.)
+- Ran `poetry run pytest` to keep the expanded domain, GUI, tooling, and CLI
+  suites green before shipping the musician test build. (Regression confidence:
+  ~94% ➜ ~95%.)
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Import UX Integration (~70% ➜ 82%)**
+   - Thread `ProjectImportService` summaries into the tracker shell so selecting
+     a bundle inside the GUI hydrates manifests/patterns without leaving the
+     app, and log manifest digests next to autosave prompts for QA export.
+2. **Step 8 Autosave Stress Evidence (~78% ➜ 85%)**
+   - Capture real harness runs for the choir demo bundle, archive the JSON
+     summaries under `docs/qa/`, and correlate pruned-count telemetry with
+     tracker logs so QA can match autosave deletions to their rehearsal notes.
+3. **Step 8 QA Hand-off Pack (~74% ➜ 84%)**
+   - Bundle a sample project + manifest, embed the LUFS/hash table plus CLI
+     transcript into `docs/step8_project_manifest.md`, and publish a checklist
+     template musicians can copy when filing autosave/import bug reports.
+

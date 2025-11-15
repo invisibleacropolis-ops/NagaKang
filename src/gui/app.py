@@ -10,7 +10,13 @@ import shutil
 import time
 from typing import Any, Callable, Deque, List
 
-from domain.project_manifest import ProjectImportPlan, SamplerManifestIndex, build_import_plan
+from domain.project_manifest import (
+    ProjectImportPlan,
+    ProjectManifest,
+    SamplerManifestIndex,
+    build_import_plan,
+    compute_file_sha256,
+)
 
 from .mixer_board import MixerDockController, MixerDockWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
@@ -64,6 +70,7 @@ class _AutosaveConfig:
     manifest_path: Path | None = None
     last_saved: float | None = None
     checkpoints: Deque[tuple[Path, List[Path]]] = field(default_factory=deque)
+    pruned_checkpoints: int = 0
 
 
 class TrackerMixerRoot(BoxLayout):
@@ -187,6 +194,7 @@ class TrackerMixerRoot(BoxLayout):
         self.layout_state = batch.layout
         tracker_state = batch.layout.tracker
         self._apply_import_plan(tracker_state)
+        self._maybe_autosave(batch)
         if self.transport_controls is not None:
             self.transport_controls.apply_state(tracker_state)
         if self.tracker_grid is not None:
@@ -195,7 +203,6 @@ class TrackerMixerRoot(BoxLayout):
             self.loudness_table.apply_state(tracker_state)
         if self.mixer_dock is not None:
             self.mixer_dock.apply_state(batch.layout.mixer)
-        self._maybe_autosave(batch)
 
     # ------------------------------------------------------------------
     # Autosave and import helpers
@@ -222,6 +229,7 @@ class TrackerMixerRoot(BoxLayout):
             layout_path.unlink(missing_ok=True)
             for extra in extras:
                 extra.unlink(missing_ok=True)
+            config.pruned_checkpoints += 1
 
     def _write_autosave_checkpoint(
         self,
@@ -243,17 +251,46 @@ class TrackerMixerRoot(BoxLayout):
         }
         if tracker_state.last_preview_summary is not None:
             payload["last_preview_summary"] = tracker_state.last_preview_summary
-        checkpoint.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         attachments: List[Path] = []
         manifest_path = config.manifest_path or self._manifest_path
+        manifest_sha, manifest_assets = self._manifest_metadata(manifest_path)
+        if manifest_sha:
+            payload["manifest_sha256"] = manifest_sha
+        if manifest_assets:
+            payload["sampler_assets"] = manifest_assets
+        checkpoint.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         if manifest_path is not None and Path(manifest_path).exists():
             manifest_copy = target_dir / f"{slug}-manifest.json"
             shutil.copy2(manifest_path, manifest_copy)
             attachments.append(manifest_copy)
+        summary = ""
+        if manifest_sha or manifest_assets:
+            asset_count = len(manifest_assets)
+            manifest_hint = manifest_sha[:8] if manifest_sha else "unknown"
+            summary = f" (manifest {manifest_hint}"
+            if asset_count:
+                summary += f" • {asset_count} assets"
+            summary += ")"
         tracker_state.autosave_recovery_prompt = (
-            f"Autosaved {config.project_id} at {slug}. Check .autosave/{config.project_id} for recovery."
+            f"Autosaved {config.project_id} at {slug}{summary}. "
+            f"Check .autosave/{config.project_id} for recovery."
         )
         return checkpoint, attachments
+
+    def _manifest_metadata(self, manifest_path: Path | None) -> tuple[str | None, List[str]]:
+        if manifest_path is None:
+            return None, []
+        resolved = Path(manifest_path)
+        if not resolved.exists():
+            return None, []
+        manifest_sha = compute_file_sha256(resolved)
+        try:
+            payload = json.loads(resolved.read_text(encoding="utf-8"))
+            manifest = ProjectManifest.model_validate(payload)
+            assets = [record.asset_name for record in manifest.sampler_assets]
+        except Exception:  # pragma: no cover - malformed manifest fallback
+            assets = []
+        return manifest_sha, assets
 
 
 class TrackerMixerApp(App):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+import json
+
 from audio.engine import EngineConfig, TempoMap
 from audio.mixer import MeterReading, MixerChannel, MixerGraph
 from audio.modules import SineOscillator
@@ -205,6 +207,9 @@ def test_tracker_mixer_root_import_plan_and_autosave(tmp_path) -> None:
 
     assert root.layout_state.tracker.import_asset_count == 1
     assert root.layout_state.tracker.import_dialog_filters[0]["label"] == "Sampler Assets"
-    assert root.transport_controls.recovery_prompt.startswith("Autosaved demo")
+    assert "manifest" in root.transport_controls.recovery_prompt
     autosave_dir = autosave_root / "demo"
-    assert any(path.name.endswith("layout.json") for path in autosave_dir.iterdir())
+    layout_files = [path for path in autosave_dir.iterdir() if path.name.endswith("layout.json")]
+    assert layout_files, "Expected at least one autosave layout file"
+    payload = json.loads(layout_files[0].read_text(encoding="utf-8"))
+    assert "manifest_sha256" in payload
