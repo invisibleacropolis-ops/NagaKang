@@ -87,6 +87,7 @@ class TransportControlsWidget(BoxLayout):
     tutorial_tips = ListProperty([])
     onboarding_hint = StringProperty("")
     tutorial_tip_index = NumericProperty(0)
+    recovery_prompt = StringProperty("")
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -105,6 +106,8 @@ class TransportControlsWidget(BoxLayout):
         if incoming_tips != previous_tips:
             self.tutorial_tip_index = 0
         self._sync_onboarding_hint()
+        prompt = state.autosave_recovery_prompt or ""
+        self.recovery_prompt = prompt
 
     def start_playback(
         self,

@@ -9,6 +9,8 @@ from audio.tracker_bridge import PatternPerformanceBridge
 from domain.models import InstrumentDefinition, InstrumentModule, Pattern, PatternStep
 from typing import cast
 
+from domain.project_manifest import SamplerManifestIndex
+
 from gui.app import TrackerMixerRoot
 from gui.mixer_board import MixerBoardAdapter, MixerDockController, MixerStripState
 from gui.preview import PreviewBatchState, PreviewOrchestrator
@@ -159,3 +161,50 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
     assert playback_requests, "Transport start should enqueue loop previews"
     assert len(service.queue) == len(playback_requests)
     assert root.transport_controls.is_playing is True
+
+
+def test_tracker_mixer_root_import_plan_and_autosave(tmp_path) -> None:
+    tracker_state = TrackerPanelState(pattern_id="demo")
+    layout = TrackerMixerLayoutState(tracker=tracker_state, mixer=MixerPanelState())
+    batch = PreviewBatchState(layout=layout, previews=[])
+
+    manifest_payload = {
+        "bucket": "demo",
+        "prefix": "velocity/",
+        "last_updated": "2025-11-25T00:00:00+00:00",
+        "assets": [
+            {"name": "choir.wav", "sha256": "04ae3180a3ec59f52f4801f2b86c2d58196fa9dc78b86a51003da6778cbad09b"}
+        ],
+    }
+    manifest_index = SamplerManifestIndex.from_payload(manifest_payload)
+    manifest_path = tmp_path / "project_manifest.json"
+    manifest_path.write_text("{\n  \"manifest_version\": \"1.0.0\"\n}", encoding="utf-8")
+
+    root = TrackerMixerRoot()
+    root.configure_sampler_manifest(manifest_index, manifest_path=manifest_path)
+
+    time_values = iter([0.0, 2.0, 4.0])
+
+    def fake_time() -> float:
+        try:
+            return next(time_values)
+        except StopIteration:  # pragma: no cover - defensive guard
+            return 10.0
+
+    autosave_root = tmp_path / ".autosave"
+    root.enable_autosave(
+        project_id="demo",
+        autosave_dir=autosave_root,
+        interval_seconds=1.0,
+        manifest_path=manifest_path,
+        time_source=fake_time,
+    )
+
+    root._apply_batch(batch)
+    root._apply_batch(batch)
+
+    assert root.layout_state.tracker.import_asset_count == 1
+    assert root.layout_state.tracker.import_dialog_filters[0]["label"] == "Sampler Assets"
+    assert root.transport_controls.recovery_prompt.startswith("Autosaved demo")
+    autosave_dir = autosave_root / "demo"
+    assert any(path.name.endswith("layout.json") for path in autosave_dir.iterdir())

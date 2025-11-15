@@ -94,6 +94,27 @@ machines.
 future GUI work can display contextual copy ("3 choir layers available") when
 presenting the dialog to musicians.
 
+### Project Export Service
+
+`src/domain/project_export_service.py` collects patterns, mixer snapshots, and
+sampler assets before serializing a manifest. The helper writes exported
+patterns under `patterns/<pattern_id>.json`, copies mixer snapshots under
+`mixer/`, mirrors sampler assets into `assets/`, and finally writes
+`project_manifest.json` plus an optional `project.json`. The CLI
+`tools/export_project_bundle.py` wraps the service so QA can run:
+
+```
+poetry run python tools/export_project_bundle.py \
+  --project-file projects/demo.json \
+  --bundle-root dist/projects/demo_bundle \
+  --mixer-snapshot "Verse=exports/verse_snapshot.json,master" \
+  --asset "choir_pad_soft.wav=imports/choir_pad_soft.wav"
+```
+
+The CLI enforces sampler-manifest parity before copying assets so exported
+bundles inherit the LUFS/checksum metadata already maintained in
+`docs/assets/audio/sampler_s3_manifest.json`.
+
 ## Autosave & Recovery Outline
 To keep Tracker/Mixer sessions resilient during the Step 8 workstream we will:
 
@@ -117,6 +138,24 @@ To keep Tracker/Mixer sessions resilient during the Step 8 workstream we will:
 These expectations now live beside the Step 7 GUI contracts so persistence
 contributors can begin wiring autosave timers and crash recovery UI.
 
+### GUI Import Dialog & Autosave Integration
+
+`TrackerMixerRoot.configure_sampler_manifest(...)` now loads
+`SamplerManifestIndex` instances, stores the dialog filters produced by
+`build_import_plan(...)`, and surfaces the filter list plus asset counts through
+`TrackerPanelState.import_dialog_filters` and `import_asset_count`. The transport
+widgets receive this state automatically so KV designers can reference the
+available choir layers when presenting the import dialog.
+
+`TrackerMixerRoot.enable_autosave(...)` wires the documented 90-second cadence by
+writing `.autosave/<project_id>/<timestamp>-layout.json` snapshots that describe
+the last preview summary, tutorial tip count, and manifest asset availability.
+When a manifest path is provided the helper copies it alongside each autosave so
+crash recovery flows preserve the exact bundle metadata that testers need to
+restore projects. The transport/tutorial column now displays the most recent
+autosave prompt ("Autosaved demo at 20251127-153000") via
+`TransportControlsWidget.recovery_prompt`.
+
 ## Next Steps
 1. Implement a dedicated `ProjectExportService` that serializes patterns,
    mixer snapshots, and manifest metadata in a single CLI command for QA.
@@ -126,5 +165,7 @@ contributors can begin wiring autosave timers and crash recovery UI.
    can load zipped bundles plus manifests without editing JSON manually.
 
 ## Update History
+- 2025-11-27 – Added export service/CLI, import-plan GUI bindings, and autosave
+  wiring for the musician testing hand-off.
 - 2025-11-26 – Initial schema, helper references, and autosave expectations for
   the Step 8 kickoff.

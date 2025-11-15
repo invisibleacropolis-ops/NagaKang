@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Mapping, Sequence
 
 from audio.mixer import MeterReading
 
@@ -21,6 +21,9 @@ class TrackerPanelState:
     is_playing: bool = False
     loop_window_steps: float = 16.0
     tutorial_tips: List[str] = field(default_factory=list)
+    import_dialog_filters: List[Mapping[str, Sequence[str]]] = field(default_factory=list)
+    import_asset_count: int = 0
+    autosave_recovery_prompt: str | None = None
 
 
 @dataclass

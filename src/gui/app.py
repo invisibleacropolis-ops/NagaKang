@@ -1,11 +1,20 @@
 """Kivy application shell that binds the preview orchestrator to widgets."""
 from __future__ import annotations
 
-from typing import Any
+from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+import shutil
+import time
+from typing import Any, Callable, Deque, List
+
+from domain.project_manifest import ProjectImportPlan, SamplerManifestIndex, build_import_plan
 
 from .mixer_board import MixerDockController, MixerDockWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
-from .state import TrackerMixerLayoutState
+from .state import TrackerMixerLayoutState, TrackerPanelState
 from .tracker_panel import (
     LoudnessTableWidget,
     TrackerGridWidget,
@@ -43,6 +52,20 @@ except Exception:  # pragma: no cover - fallback for non-GUI environments
             self.children.append(widget)
 
 
+@dataclass
+class _AutosaveConfig:
+    """Runtime configuration describing how autosave checkpoints behave."""
+
+    project_id: str
+    autosave_dir: Path
+    interval_seconds: float = 90.0
+    max_checkpoints: int = 5
+    time_source: Callable[[], float] = time.monotonic
+    manifest_path: Path | None = None
+    last_saved: float | None = None
+    checkpoints: Deque[tuple[Path, List[Path]]] = field(default_factory=deque)
+
+
 class TrackerMixerRoot(BoxLayout):
     """Top-level widget that polls the orchestrator and exposes layout state."""
 
@@ -69,6 +92,10 @@ class TrackerMixerRoot(BoxLayout):
             self.bind_tracker_controller(tracker_controller)
         if mixer_controller is not None:
             self.bind_mixer_controller(mixer_controller)
+        self._import_plan: ProjectImportPlan | None = None
+        self._sampler_manifest: SamplerManifestIndex | None = None
+        self._manifest_path: Path | None = None
+        self._autosave_config: _AutosaveConfig | None = None
 
     def _build_default_children(self) -> None:
         """Instantiate tracker-side widgets so demos run without KV layouts."""
@@ -102,6 +129,49 @@ class TrackerMixerRoot(BoxLayout):
         if self.mixer_dock is not None:
             self.mixer_dock.bind_controller(controller)
 
+    def configure_sampler_manifest(
+        self,
+        manifest: SamplerManifestIndex,
+        *,
+        manifest_path: Path | None = None,
+    ) -> None:
+        """Capture sampler manifest metadata for import dialogs and autosave."""
+
+        self._sampler_manifest = manifest
+        self._import_plan = build_import_plan(manifest)
+        if manifest_path is not None:
+            self._manifest_path = Path(manifest_path)
+
+    def enable_autosave(
+        self,
+        *,
+        project_id: str,
+        autosave_dir: Path,
+        interval_seconds: float = 90.0,
+        max_checkpoints: int = 5,
+        manifest_path: Path | None = None,
+        time_source: Callable[[], float] | None = None,
+    ) -> None:
+        """Persist tracker state summaries plus manifests under `.autosave/`."""
+
+        if interval_seconds <= 0:
+            raise ValueError("interval_seconds must be positive")
+        if max_checkpoints <= 0:
+            raise ValueError("max_checkpoints must be positive")
+        autosave_dir = Path(autosave_dir)
+        autosave_dir.mkdir(parents=True, exist_ok=True)
+        manifest_override = manifest_path or self._manifest_path
+        if manifest_override is not None:
+            self._manifest_path = Path(manifest_override)
+        self._autosave_config = _AutosaveConfig(
+            project_id=project_id,
+            autosave_dir=autosave_dir,
+            interval_seconds=float(interval_seconds),
+            max_checkpoints=int(max_checkpoints),
+            manifest_path=self._manifest_path,
+            time_source=time_source or time.monotonic,
+        )
+
     def bind_orchestrator(self, orchestrator: PreviewOrchestrator, *, interval: float = 0.5) -> None:
         self._orchestrator = orchestrator
         if hasattr(Clock, "schedule_interval"):
@@ -116,6 +186,7 @@ class TrackerMixerRoot(BoxLayout):
     def _apply_batch(self, batch: PreviewBatchState) -> None:
         self.layout_state = batch.layout
         tracker_state = batch.layout.tracker
+        self._apply_import_plan(tracker_state)
         if self.transport_controls is not None:
             self.transport_controls.apply_state(tracker_state)
         if self.tracker_grid is not None:
@@ -124,6 +195,65 @@ class TrackerMixerRoot(BoxLayout):
             self.loudness_table.apply_state(tracker_state)
         if self.mixer_dock is not None:
             self.mixer_dock.apply_state(batch.layout.mixer)
+        self._maybe_autosave(batch)
+
+    # ------------------------------------------------------------------
+    # Autosave and import helpers
+    # ------------------------------------------------------------------
+    def _apply_import_plan(self, tracker_state: TrackerPanelState) -> None:
+        if self._import_plan is None:
+            return
+        tracker_state.import_dialog_filters = list(self._import_plan.dialog_filters)
+        tracker_state.import_asset_count = self._import_plan.asset_count
+
+    def _maybe_autosave(self, batch: PreviewBatchState) -> None:
+        config = self._autosave_config
+        if config is None:
+            return
+        now = config.time_source()
+        if config.last_saved is not None and now - config.last_saved < config.interval_seconds:
+            return
+        tracker_state = batch.layout.tracker
+        checkpoint, attachments = self._write_autosave_checkpoint(config, tracker_state)
+        config.last_saved = now
+        config.checkpoints.append((checkpoint, attachments))
+        while len(config.checkpoints) > config.max_checkpoints:
+            layout_path, extras = config.checkpoints.popleft()
+            layout_path.unlink(missing_ok=True)
+            for extra in extras:
+                extra.unlink(missing_ok=True)
+
+    def _write_autosave_checkpoint(
+        self,
+        config: _AutosaveConfig,
+        tracker_state: TrackerPanelState,
+    ) -> tuple[Path, List[Path]]:
+        target_dir = config.autosave_dir / config.project_id
+        target_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(UTC)
+        slug = timestamp.strftime("%Y%m%d-%H%M%S")
+        checkpoint = target_dir / f"{slug}-layout.json"
+        payload = {
+            "project_id": config.project_id,
+            "saved_at": timestamp.isoformat(),
+            "pattern_id": tracker_state.pattern_id,
+            "pending_request_count": len(tracker_state.pending_requests),
+            "import_asset_count": tracker_state.import_asset_count,
+            "tutorial_tip_count": len(tracker_state.tutorial_tips),
+        }
+        if tracker_state.last_preview_summary is not None:
+            payload["last_preview_summary"] = tracker_state.last_preview_summary
+        checkpoint.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        attachments: List[Path] = []
+        manifest_path = config.manifest_path or self._manifest_path
+        if manifest_path is not None and Path(manifest_path).exists():
+            manifest_copy = target_dir / f"{slug}-manifest.json"
+            shutil.copy2(manifest_path, manifest_copy)
+            attachments.append(manifest_copy)
+        tracker_state.autosave_recovery_prompt = (
+            f"Autosaved {config.project_id} at {slug}. Check .autosave/{config.project_id} for recovery."
+        )
+        return checkpoint, attachments
 
 
 class TrackerMixerApp(App):

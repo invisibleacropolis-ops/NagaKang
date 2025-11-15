@@ -1344,3 +1344,43 @@
 3. **CI Artifact Parity Checks (~0% ➜ 25%)**
    - Extend the CI helper to attach SHA-256 digests for mixer trend outputs and cross-link them with the sampler manifest so QA can confirm artifacts haven’t drifted between stress harness and mixer runs.
 
+# Session Summary (Step 8 Export CLI & Autosave Wiring – Project & Asset Management)
+- Re-read README §8, `docs/step8_project_manifest.md`, and the manifest helper
+  contracts before touching code so the export/import/autosave work stayed
+  aligned with the Comprehensive Development Plan. (Plan verification: ~26% ➜
+  ~27%.)
+- Added `src/domain/project_export_service.py` and
+  `tools/export_project_bundle.py`, enabling QA to serialize tracker projects,
+  mixer snapshots, sampler assets, and manifests from a single command. Tests
+  (`tests/test_domain_project_export_service.py`,
+  `tests/test_tools_export_project_bundle.py`) cover pattern exports, checksum
+  enforcement, and CLI flows. (Step 8 project export service completion: ~45% ➜
+  ~70%.)
+- Threaded `SamplerManifestIndex` into `TrackerMixerRoot`, plumbed dialog
+  filters + asset counts through `TrackerPanelState`, and surfaced the data in
+  `TransportControlsWidget` for the tutorial column. Regression coverage in
+  `tests/test_gui_preview.py` now verifies the import-plan wiring. (Step 8
+  import UX & file dialog completion: ~25% ➜ ~48%.)
+- Implemented autosave timers and crash-checkpoint helpers inside
+  `TrackerMixerRoot`, writing `.autosave/<project_id>/<timestamp>-layout.json`
+  summaries plus manifest copies and mirroring prompts through
+  `TransportControlsWidget.recovery_prompt`. Updated the Step 8 doc, README §8,
+  and documentation index to brief external engineers. (Step 8 autosave
+  implementation completion: ~35% ➜ ~58%.)
+- Ran `poetry run pytest` to cover the new domain, CLI, and GUI regression
+  suites alongside the existing tracker/mixer coverage.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Import Service & Recovery UX (~48% ➜ ~60%)**
+   - Build the inverse `ProjectImportService` + CLI that hydrates bundles back
+     into tracker/mixer state, verify autosave recovery prompts surface the
+     restored manifest metadata, and document the workflow in README §8.
+2. **Step 8 Autosave Stress Harness (~58% ➜ ~70%)**
+   - Exercise the new autosave checkpoints under sustained preview activity,
+     capture pruning/latency metrics, and document how `.autosave/` entries map
+     to tracker logs for QA reproductions.
+3. **Step 8 QA Hand-off Pack (~70% ➜ ~80%)**
+   - Expand the export CLI doc with sample bundles, LUFS metadata tables, and a
+     rehearsal-ready checklist so remote musicians can mirror today’s workflow
+     without editor access.
+
