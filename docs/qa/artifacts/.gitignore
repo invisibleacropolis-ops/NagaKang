@@ -7,3 +7,10 @@
 !history/
 !history/*.md
 !history/*.json
+!mixer_trends/
+!mixer_trends/README.md
+!mixer_trends/baseline/
+!mixer_trends/baseline/mixer_trend_baseline.json
+!mixer_trends/history/
+!mixer_trends/history/*.md
+!mixer_trends/history/*.json

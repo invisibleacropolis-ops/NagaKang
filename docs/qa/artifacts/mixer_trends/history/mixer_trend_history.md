@@ -1,0 +1,3 @@
+# Mixer Trend History
+
+- 2025-11-14T23:42:34.026687+00:00 – bootstrap: peak 2.3883642328236605 dBFS / RMS 2.3883642328236605 dBFS

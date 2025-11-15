@@ -1,0 +1,47 @@
+{
+  "bucket": "nagakang-audio-assets",
+  "prefix": "velocity/",
+  "last_updated": "2025-11-14T23:43:13.362682+00:00",
+  "assets": [
+    {
+      "name": "choir_pad_soft.wav",
+      "nas_path": "Rehearsal NAS:/NagaKang/velocity/2024-04-choir/choir_pad_soft.wav",
+      "s3_uri": "s3://nagakang-audio-assets/velocity/2024-04-choir/choir_pad_soft.wav",
+      "lufs": -20.6,
+      "peak_dbfs": -3.1,
+      "sha256": "a96353c5bdcc504cc50ca783f08ffb3fbd633a869ca7c3a7f99c1d477993b4e5"
+    },
+    {
+      "name": "choir_pad_bold.wav",
+      "nas_path": "Rehearsal NAS:/NagaKang/velocity/2024-04-choir/choir_pad_bold.wav",
+      "s3_uri": "s3://nagakang-audio-assets/velocity/2024-04-choir/choir_pad_bold.wav",
+      "lufs": -13.2,
+      "peak_dbfs": -0.8,
+      "sha256": "e5e8ad6bb28335b7df1e86be4c0b9a3c83e5884c68120c0114558e7c301f1800"
+    },
+    {
+      "name": "strings_vs_choir_blend.wav",
+      "nas_path": "Rehearsal NAS:/NagaKang/velocity/2024-04-choir/strings_vs_choir_blend.wav",
+      "s3_uri": "s3://nagakang-audio-assets/velocity/2024-04-choir/strings_vs_choir_blend.wav",
+      "lufs": -16.4,
+      "peak_dbfs": -1.7,
+      "sha256": "dbd0c7432f7d5f8c7a9fea8b2a5dddf33e9ecfa7c1cb7f77009c5440dca8278e"
+    },
+    {
+      "name": "choir_swell_long.wav",
+      "nas_path": "Rehearsal NAS:/NagaKang/velocity/2024-04-choir/choir_swell_long.wav",
+      "s3_uri": "s3://nagakang-audio-assets/velocity/2024-04-choir/choir_swell_long.wav",
+      "lufs": -18.5,
+      "peak_dbfs": -7.1,
+      "sha256": "a78589b2ce7247972ec12777e922ebdffbc9c510a440f7479f7a4eae01caca47"
+    },
+    {
+      "name": "gospel_stab_short.wav",
+      "nas_path": "Rehearsal NAS:/NagaKang/velocity/2024-04-vocal-stabs/gospel_stab_short.wav",
+      "s3_uri": "s3://nagakang-audio-assets/velocity/2024-04-vocal-stabs/gospel_stab_short.wav",
+      "lufs": -15.4,
+      "peak_dbfs": -4.2,
+      "sha256": "eb89270f71c7d2f583863fb346315cf7636dbfe55721f14e205d0403cb89163b"
+    }
+  ]
+}

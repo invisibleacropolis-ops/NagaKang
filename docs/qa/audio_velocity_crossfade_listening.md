@@ -37,7 +37,8 @@ heuristics and analysed with `audio.metrics`.
 ## Choir pad comparison notes
 
 - Captures `choir_pad_soft.wav` and `choir_pad_bold.wav` are archived in
-  `docs/assets/audio/README.md` with LUFS metadata and the rehearsal NAS path.
+  `docs/assets/audio/README.md` with LUFS metadata, NAS paths, and the new
+  S3 mirror references listed in `sampler_s3_manifest.json`.
 - The choir set smeared transitions at the 12-step string preset. Dropping to a
   10-step crossfade restored breathiness without exposing layer boundaries.
 - When stacking strings and choir pads, keep the choir sampler tagged as
@@ -77,6 +78,7 @@ heuristics and analysed with `audio.metrics`.
 
 - Mirror the gospel stab renders into the secure S3 bucket so remote
   collaborators can A/B the updated velocity heuristics without the rehearsal
-  NAS.
+  NAS. (Complete – see `sampler_s3_manifest.json` for the exact keys and
+  checksums.)
 - Capture sustained choir swells with longer releases to confirm the vocal
   amplitude defaults still hold when legato tails overlap the stab set.

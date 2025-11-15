@@ -1206,3 +1206,19 @@
      contract, introduce subgroup/solo scaffolding inside
      `audio.mixer.MixerGraph`, and begin wiring the Kivy mixer mock to
      the new channel/bus APIs.
+# Session Summary (Step 7 Layout Stress & Mixer Trend Artifacts – GUI/UX Implementation)
+- Re-read README §7 plus the mixer QA checklist to confirm the transport + mixer dock goals before touching the layout shell. (Plan verification: ~16% ➜ ~18%.)
+- Added `MixerDockWidget`, restructured `TrackerMixerRoot` around a tracker column + mixer dock split, and documented the latency/spacing constraints so Step 7 layout stress is reproducible for external Kivy contributors. (Step 7 layout stress completion: ~36% ➜ 100%.)
+- Captured the new wiring/testing strategy inside `docs/step7_gui_shell.md` and `tests/test_gui_mixer_board.py`, giving GUI engineers a regression-backed reference for the mixer panel bindings. (Step 7 documentation & regression coverage: ~44% ➜ ~52%.)
+- Implemented `tools/mixer_trend_ci.py`, added the mixer trend artifact runbook, and generated the initial baseline/history entries so CI can publish `mixer_diagnostics` deltas next to the audio renders. (CI mixer trend artifacts integration: ~96% ➜ 100%.)
+- Mirrored the choir swell and gospel stab references into `docs/assets/audio/sampler_s3_manifest.json`, expanded the README table with S3 URIs, and annotated the velocity listening notes so remote QA teams have cloud pointers plus hashes. (Sampler asset S3 mirroring: ~99% ➜ 100%.)
+- Ran `poetry run pytest` to validate the new GUI widgets, mixer trend tooling, and S3 manifest references alongside the existing suite.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 7 Mixer Gesture Prototypes (~0% ➜ 20%)**
+   - Prototype insert drag/reorder gestures in KV (or document the API expectations) so the mixer dock wiring feeds real user interactions beyond telemetry mirroring.
+2. **Tracker Tutorial Screenshot Refresh (~44% ➜ 55%)**
+   - Capture the new three-panel layout (tracker column + mixer dock) with annotated onboarding callouts for docs/marketing so external GUI partners can reference concrete visuals.
+3. **CI Artifact Parity Checks (~0% ➜ 25%)**
+   - Extend the CI helper to attach SHA-256 digests for mixer trend outputs and cross-link them with the sampler manifest so QA can confirm artifacts haven’t drifted between stress harness and mixer runs.
+

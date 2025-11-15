@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .mixer_board import MixerDockWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
 from .state import TrackerMixerLayoutState
 from .tracker_panel import (
@@ -49,6 +50,8 @@ class TrackerMixerRoot(BoxLayout):
     tracker_grid = ObjectProperty(None)
     loudness_table = ObjectProperty(None)
     transport_controls = ObjectProperty(None)
+    mixer_dock = ObjectProperty(None)
+    tracker_column = ObjectProperty(None)
 
     def __init__(self, tracker_controller: TrackerPanelController | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -63,13 +66,17 @@ class TrackerMixerRoot(BoxLayout):
         """Instantiate tracker-side widgets so demos run without KV layouts."""
 
         if getattr(self, "orientation", None) is None:
-            self.orientation = "vertical"
+            self.orientation = "horizontal"
+        self.tracker_column = BoxLayout(orientation="vertical")
         self.transport_controls = TransportControlsWidget()
         self.tracker_grid = TrackerGridWidget()
         self.loudness_table = LoudnessTableWidget()
-        self.add_widget(self.transport_controls)
-        self.add_widget(self.tracker_grid)
-        self.add_widget(self.loudness_table)
+        for widget in (self.transport_controls, self.tracker_grid, self.loudness_table):
+            if hasattr(self.tracker_column, "add_widget"):
+                self.tracker_column.add_widget(widget)
+        self.mixer_dock = MixerDockWidget()
+        self.add_widget(self.tracker_column)
+        self.add_widget(self.mixer_dock)
 
     def bind_tracker_controller(self, controller: TrackerPanelController) -> None:
         """Wire controller gestures into the tracker widgets."""
@@ -100,6 +107,8 @@ class TrackerMixerRoot(BoxLayout):
             self.tracker_grid.apply_state(tracker_state)
         if self.loudness_table is not None:
             self.loudness_table.apply_state(tracker_state)
+        if self.mixer_dock is not None:
+            self.mixer_dock.apply_state(batch.layout.mixer)
 
 
 class TrackerMixerApp(App):
