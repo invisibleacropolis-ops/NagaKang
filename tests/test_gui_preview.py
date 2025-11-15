@@ -7,8 +7,10 @@ from audio.mixer import MeterReading, MixerChannel, MixerGraph
 from audio.modules import SineOscillator
 from audio.tracker_bridge import PatternPerformanceBridge
 from domain.models import InstrumentDefinition, InstrumentModule, Pattern, PatternStep
+from typing import cast
+
 from gui.app import TrackerMixerRoot
-from gui.mixer_board import MixerBoardAdapter, MixerStripState
+from gui.mixer_board import MixerBoardAdapter, MixerDockController, MixerStripState
 from gui.preview import PreviewBatchState, PreviewOrchestrator
 from gui.state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
 from gui.tracker_panel import TrackerPanelController
@@ -93,6 +95,15 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
     editor.set_step(0, note=64, velocity=90, instrument_id="lead")
     service = MutationPreviewService(editor)
     controller = TrackerPanelController(service)
+    class DummyDockController:
+        def __init__(self) -> None:
+            self.reorder_calls: list[tuple[str, int, int]] = []
+
+        def reorder_inserts(self, channel_name: str, from_index: int, to_index: int) -> MixerStripState:
+            self.reorder_calls.append((channel_name, from_index, to_index))
+            return mixer_state.strip_states[channel_name]
+
+    dock_controller = cast(MixerDockController, DummyDockController())
     tracker_state = TrackerPanelState(
         pattern_id=pattern.id,
         tempo_bpm=140.0,
@@ -128,7 +139,7 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
             return batch
 
     orchestrator = DummyOrchestrator()
-    root = TrackerMixerRoot(tracker_controller=controller)
+    root = TrackerMixerRoot(tracker_controller=controller, mixer_controller=dock_controller)
     root.bind_orchestrator(orchestrator, interval=0.0)
 
     root._poll_orchestrator()
@@ -140,6 +151,8 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
     assert not service.queue
     assert root.mixer_dock.master_peak_db == pytest.approx(-1.0)
     assert root.mixer_dock.strip_container.children
+    root.mixer_dock.request_insert_reorder("Lead", 0, 0)
+    assert dock_controller.reorder_calls == [("Lead", 0, 0)]
 
     playback_requests = root.transport_controls.start_playback()
 

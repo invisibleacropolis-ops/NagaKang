@@ -1,3 +1,42 @@
+# Session Summary (Step 7 Mixer Gestures & CI Parity – GUI/UX Implementation)
+- Re-read README §7 and the mixer QA artifact checklist to confirm that the
+  outstanding Step 7 deliverables focused on insert gestures, tutorial
+  screenshots, and CI parity before modifying widgets, docs, or tooling. (Plan
+  verification: ~18% ➜ ~20%.)
+- Added `MixerDockController`, insert-reorder callbacks on
+  `MixerStripWidget`, controller binding on `MixerDockWidget`, and optional
+  mixer-controller wiring inside `TrackerMixerRoot`/`TrackerMixerApp`, giving KV
+  prototypes a documented way to drive insert drag/reorder gestures without
+  bypassing the adapter. Tests in `tests/test_gui_mixer_board.py` and
+  `tests/test_gui_preview.py` cover the new gesture flow. (Step 7 mixer gesture
+  prototypes completion: ~0% ➜ ~20%.)
+- Captured the tracker column + mixer dock screenshot in
+  `docs/assets/ui/tracker_mixer_three_panel.svg`, documented the binding plan in
+  `docs/step7_gui_shell.md`, and updated the asset manifest so external GUI
+  teams have an annotated reference. (Step 7 tutorial screenshot refresh &
+  documentation completion: ~52% ➜ ~60%.)
+- Extended `tools/mixer_trend_ci.py`, `docs/qa/artifacts/mixer_trends/README.md`,
+  and `docs/documentation_structure.md` with SHA-256 digests plus sampler
+  manifest linkage so CI artifacts have built-in parity checks alongside the
+  mixer summaries. Regression coverage in `tests/test_mixer_trend_ci.py`
+  verifies the new metadata. (CI artifact parity checks completion: ~0% ➜ ~30%.)
+- Ran `poetry run pytest` to confirm the GUI, tooling, and audio suites remain
+  green after the Step 7 closure work.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Project & Asset Manifest Kickoff (~0% ➜ ~10%)**
+   - Define the on-disk project manifest (patterns, mixer snapshots, sampler
+     assets) and document the directory schema per README §8 so designers can
+     trade projects without spelunking through ad-hoc folders.
+2. **Step 8 Import/Export Workflow (~0% ➜ ~8%)**
+   - Prototype file dialogs plus JSON import/export helpers for instruments and
+     samples, ensuring the asset pipeline references the S3 manifest hashes and
+     records LUFS metadata alongside each transfer.
+3. **Step 8 Autosave & Recovery (~0% ➜ ~8%)**
+   - Sketch the autosave cadence, crash-recovery checkpoints, and backup naming
+     scheme so future sessions can wire real persistence into the tracker/mixer
+     shell.
+
 # Session Summary (Step 7 Transport Strip Polish & KV Demo Wiring – GUI/UX Implementation)
 - Re-read the Comprehensive Development Plan (README §7 plus the Step 1 onboarding guidance) to verify the transport/tutorial polish scope before editing widgets or docs. (Plan verification: ~14% ➜ ~16%.)
 - Extended `TransportControlsWidget` with tutorial tip rotation, loop-window clamping, and optional window overrides so TrackerMixerApp demos can bind play/stop/loop toggles without rewriting preview logic. (Step 7 transport polish completion: ~35% ➜ 100%.)
@@ -1221,4 +1260,3 @@
    - Capture the new three-panel layout (tracker column + mixer dock) with annotated onboarding callouts for docs/marketing so external GUI partners can reference concrete visuals.
 3. **CI Artifact Parity Checks (~0% ➜ 25%)**
    - Extend the CI helper to attach SHA-256 digests for mixer trend outputs and cross-link them with the sampler manifest so QA can confirm artifacts haven’t drifted between stress harness and mixer runs.
-

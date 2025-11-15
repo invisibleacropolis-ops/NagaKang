@@ -97,6 +97,17 @@ Binding these helpers directly ensures the TrackerMixerApp shell stays declarati
 - `MixerDockWidget` dynamically adds/removes strip widgets based on `MixerPanelState`, ensuring CI demos and layout rehearsals show the same strip count as the mixer graph. The regression suite covers the lifecycle via `tests/test_gui_mixer_board.py`.
 - Polling the orchestrator at 500 ms keeps tracker telemetry and mixer meters within ~12 ms of each other under synthetic stress. These notes should accompany screenshots when sharing the layout shell with outside Kivy contributors.
 
+## Mixer Insert Gesture Prototype
+
+- `MixerStripWidget` now exposes `bind_reorder_callback(...)` and `request_insert_reorder(...)` so KV bindings can wire drag handles or long-press reorder menus without touching mixer internals. The widget stores the callback supplied by the dock and mirrors the updated insert order after each gesture.
+- `MixerDockWidget.bind_controller(...)` accepts the new `MixerDockController`, which forwards insert reorders to `MixerBoardAdapter.reorder_channel_inserts(...)` and re-hydrates the strip state immediately. KV code can also call `MixerDockWidget.request_insert_reorder(...)` directly when coordinating gestures between siblings.
+- `TrackerMixerRoot` and `TrackerMixerApp` accept an optional `MixerDockController` at construction time, keeping the tracker and mixer controllers symmetric. This ensures transport gestures and insert gestures both route through testable controllers instead of anonymous callbacks.
+- The regression suite exercises controller binding via `tests/test_gui_mixer_board.py` and `tests/test_gui_preview.py`, proving that insert drags update both the adapter and the dock widgets.
+
+![Tracker, tutorial, and mixer dock layout with insert reorder callouts](assets/ui/tracker_mixer_three_panel.svg)
+
+The annotated capture above is bundled in `docs/assets/ui/tracker_mixer_three_panel.svg`. Share this reference with design partners so they can compare live screenshots to the documented spacing ratios and onboarding callouts.
+
 ## Next UI Tasks
 1. Flesh out tracker-side widgets (grid, loudness table, transport) that consume `TrackerPanelState`.
 2. Bind return/insert gestures in KV language, referencing the adapter helpers documented above.

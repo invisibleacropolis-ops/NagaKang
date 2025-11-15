@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, MutableMapping, TYPE_CHECKING, Type
+from typing import Callable, Dict, List, Mapping, MutableMapping, TYPE_CHECKING, Type
 
 from audio.mixer import MeterReading, MixerGraph
 
@@ -77,6 +77,10 @@ class MixerStripWidget(BoxLayout):
     is_return = BooleanProperty(False)
     return_level_db = NumericProperty(0.0)
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._insert_reorder_callback: Callable[[int, int], List[str]] | None = None
+
     def apply_state(self, state: MixerStripState) -> None:
         self.strip_name = state.name
         self.meter_peak_db = state.post_fader_meter.peak_db
@@ -98,6 +102,23 @@ class MixerStripWidget(BoxLayout):
             meter = MeterReading(-float("inf"), -float("inf"))
         self.subgroup_peak_db = meter.peak_db
         self.subgroup_rms_db = meter.rms_db
+
+    # ------------------------------------------------------------------
+    # Gesture hooks
+    # ------------------------------------------------------------------
+    def bind_reorder_callback(self, callback: Callable[[int, int], List[str]] | None) -> None:
+        """Register a callback that handles insert drag/reorder gestures."""
+
+        self._insert_reorder_callback = callback
+
+    def request_insert_reorder(self, from_index: int, to_index: int) -> List[str]:
+        """Trigger insert reordering and mirror the updated order locally."""
+
+        if self._insert_reorder_callback is None:
+            raise RuntimeError("Insert reorder callback has not been bound")
+        updated_order = self._insert_reorder_callback(from_index, to_index)
+        self.insert_order = list(updated_order)
+        return list(self.insert_order)
 
 
 class MixerBoardAdapter:
@@ -199,6 +220,7 @@ class MixerDockWidget(BoxLayout):
     master_rms_db = NumericProperty(-120.0)
     strip_container = ObjectProperty(None)
     return_container = ObjectProperty(None)
+    controller = ObjectProperty(None)
 
     def __init__(
         self,
@@ -216,19 +238,39 @@ class MixerDockWidget(BoxLayout):
         self.return_container = self._build_container()
         self.add_widget(self.strip_container)
         self.add_widget(self.return_container)
+        self._controller: MixerDockController | None = None
 
     def _build_container(self) -> BoxLayout:
         return BoxLayout(orientation="vertical")
 
+    def bind_controller(self, controller: "MixerDockController") -> None:
+        """Attach a controller that executes insert and return gestures."""
+
+        self._controller = controller
+        self.controller = controller
+        for name, widget in self._channel_widgets.items():
+            self._attach_reorder_callback(name, widget)
+
     def apply_state(self, state: "MixerPanelState") -> None:
-        self._sync_widgets(state.strip_states, self._channel_widgets, self.strip_container)
-        self._sync_widgets(state.return_states, self._return_widgets, self.return_container)
+        self._sync_widgets(state.strip_states, self._channel_widgets, self.strip_container, is_return=False)
+        self._sync_widgets(state.return_states, self._return_widgets, self.return_container, is_return=True)
         if state.master_meter is None:
             self.master_peak_db = -float("inf")
             self.master_rms_db = -float("inf")
         else:
             self.master_peak_db = state.master_meter.peak_db
             self.master_rms_db = state.master_meter.rms_db
+
+    def request_insert_reorder(self, channel_name: str, from_index: int, to_index: int) -> List[str]:
+        """Proxy reorder gestures from KV bindings into the controller."""
+
+        if self._controller is None:
+            raise RuntimeError("MixerDockController has not been bound")
+        new_state = self._controller.reorder_inserts(channel_name, from_index, to_index)
+        widget = self._channel_widgets.get(channel_name)
+        if widget is not None:
+            widget.apply_state(new_state)
+        return list(new_state.insert_order)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -238,6 +280,8 @@ class MixerDockWidget(BoxLayout):
         states: Mapping[str, MixerStripState],
         widgets: MutableMapping[str, MixerStripWidget],
         container: BoxLayout,
+        *,
+        is_return: bool,
     ) -> None:
         seen = set()
         for name, strip_state in states.items():
@@ -248,9 +292,40 @@ class MixerDockWidget(BoxLayout):
                 widgets[name] = widget
                 if hasattr(container, "add_widget"):
                     container.add_widget(widget)
+                if not is_return:
+                    self._attach_reorder_callback(name, widget)
             widget.apply_state(strip_state)
         for name in list(widgets):
             if name not in seen:
                 widget = widgets.pop(name)
+                if not is_return:
+                    self._detach_reorder_callback(widget)
                 if hasattr(container, "remove_widget"):
                     container.remove_widget(widget)
+
+    def _attach_reorder_callback(self, channel_name: str, widget: MixerStripWidget) -> None:
+        if not hasattr(widget, "bind_reorder_callback"):
+            return
+        if self._controller is None:
+            widget.bind_reorder_callback(None)
+            return
+
+        def _handler(from_index: int, to_index: int) -> List[str]:
+            return self.request_insert_reorder(channel_name, from_index, to_index)
+
+        widget.bind_reorder_callback(_handler)
+
+    def _detach_reorder_callback(self, widget: MixerStripWidget) -> None:
+        if hasattr(widget, "bind_reorder_callback"):
+            widget.bind_reorder_callback(None)
+
+
+class MixerDockController:
+    """Controller forwarding dock gestures to :class:`MixerBoardAdapter`."""
+
+    def __init__(self, adapter: MixerBoardAdapter) -> None:
+        self._adapter = adapter
+
+    def reorder_inserts(self, channel_name: str, from_index: int, to_index: int) -> MixerStripState:
+        self._adapter.reorder_channel_inserts(channel_name, from_index, to_index)
+        return self._adapter.strip_state(channel_name)

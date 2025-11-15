@@ -32,7 +32,10 @@ def test_mixer_trend_ci_generates_markdown_and_history(tmp_path):
     )
     assert exit_code == 0
     assert baseline.exists()
-    assert "Mixer Trend Snapshot" in output_markdown.read_text(encoding="utf-8")
+    markdown_text = output_markdown.read_text(encoding="utf-8")
+    assert "Mixer Trend Snapshot" in markdown_text
+    assert "Artifact digests" in markdown_text
+    assert "Sampler manifest linkage" in markdown_text
 
     exit_code = mixer_trend_ci.main(
         [
@@ -60,3 +63,5 @@ def test_mixer_trend_ci_generates_markdown_and_history(tmp_path):
     assert len(history_entries) == 2
     history_md = history_markdown.read_text(encoding="utf-8")
     assert "follow-up" in history_md
+    assert history_entries[-1]["artifact_digests"]
+    assert "sampler_manifest" in history_entries[-1]

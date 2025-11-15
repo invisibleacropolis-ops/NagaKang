@@ -1,7 +1,13 @@
 """Kivy-facing GUI scaffolding for Step 7 of the comprehensive plan."""
 
 from .app import TrackerMixerApp, TrackerMixerRoot
-from .mixer_board import MixerBoardAdapter, MixerDockWidget, MixerStripState, MixerStripWidget
+from .mixer_board import (
+    MixerBoardAdapter,
+    MixerDockController,
+    MixerDockWidget,
+    MixerStripState,
+    MixerStripWidget,
+)
 from .preview import PreviewBatchState, PreviewOrchestrator
 from .state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
 from .tracker_panel import (
@@ -15,6 +21,7 @@ __all__ = [
     "TrackerMixerApp",
     "TrackerMixerRoot",
     "MixerBoardAdapter",
+    "MixerDockController",
     "MixerStripState",
     "MixerStripWidget",
     "MixerDockWidget",
