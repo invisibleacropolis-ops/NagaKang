@@ -97,7 +97,10 @@ Support sample recording and editing (basic waveform editor).
 Create versioned autosave, crash recovery, and backup system.
 The manifest schema, sampler transfer workflow, and autosave expectations for
 this milestone now live in `docs/step8_project_manifest.md` alongside references
-to `src/domain/project_manifest.py`.
+to `src/domain/project_manifest.py`. The accompanying export CLI
+(`tools/export_project_bundle.py`) and GUI autosave hooks described below keep
+the README §8 deliverables actionable for outside engineers preparing bundles
+for QA.
 9. Performance & Quality Assurance
 Establish benchmarking suite (buffer underrun tests, CPU usage profiling).
 Stress harness outputs are catalogued in `docs/qa/audio_engine_benchmarks.md`, linking benchmark evidence back to this Plan §9 milestone.

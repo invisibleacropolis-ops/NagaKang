@@ -13,6 +13,7 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step6_mixer_kivy_mock.py` – Prototype MixerGraph → Kivy adapter illustrating strip state binding, subgroup metering, return-bus presets, and insert reordering affordances.
 - `docs/step7_gui_shell.md` – Step 7 kickoff covering the preview orchestrator, tracker/mixer layout contracts, tracker grid & loudness widgets, transport/tutorial bindings, widget adapters promoted from the mock into production, plus the insert-gesture QA guidance and Step 8 preview tasks added during the milestone closure.
 - `docs/step8_project_manifest.md` – Step 8 kickoff capturing the manifest schema, sampler asset transfer workflow, autosave cadence, and the outstanding persistence tasks referenced by README §8.
+- `tools/export_project_bundle.py` – CLI wrapper around `ProjectExportService` that serializes tracker projects, mixer snapshots, and sampler assets into the manifest bundle promised in Step 8. The helper enforces sampler-manifest parity and mirrors the autosave expectations documented in the Step 8 note.
 - `tools/mixer_diagnostics.py` – CLI for rendering the Step 6 demo graph, exporting subgroup meters, return levels, and mixer automation events for QA.
 - `docs/qa/artifacts/mixer_trends/README.md` – Mixer trend artifact workflow tying `mixer_trend_ci.py` outputs to the shared audio reference pack and CI publishing expectations.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals. UI captures such as `docs/assets/ui/transport_strip_annotations.svg` and `docs/assets/ui/tracker_mixer_three_panel.svg` document Step 7 bindings for external designers.
@@ -75,4 +76,5 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-18 – Added stress harness trend comparison workflow, S3 smoke test utility, and Mermaid CLI version pinning guidance.
 - 2025-11-19 – Documented the Step 3 audio engine kickoff, .env-based staging smoke test workflow, and Puppeteer cache reuse in CI.
 - 2025-11-24 – Added mixer trend artifact references, S3 sampler manifest pointers, and the `mixer_trend_ci.py` runbook entry for CI instrumentation.
+- 2025-11-27 – Added the Step 8 export CLI reference and captured the GUI autosave/import-plan integration.
 - 2025-11-26 – Documented the Step 8 manifest/autosave kickoff and linked the new domain helpers plus README references.
