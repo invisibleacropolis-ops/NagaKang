@@ -1,6 +1,8 @@
 from audio.mixer import MeterReading
 
-from gui.mixer_board import MixerDockWidget, MixerStripState
+from audio.mixer import MeterReading
+
+from gui.mixer_board import MixerDockController, MixerDockWidget, MixerStripState
 from gui.state import MixerPanelState
 
 
@@ -72,3 +74,50 @@ def test_mixer_dock_widget_handles_removed_strips() -> None:
     assert not dock.return_container.children
     assert dock.master_peak_db == -float("inf")
     assert dock.master_rms_db == -float("inf")
+
+
+class AdapterStub:
+    def __init__(self) -> None:
+        self.state = MixerStripState(
+            name="Lead",
+            fader_db=-3.0,
+            pan=0.0,
+            post_fader_meter=MeterReading(-6.0, -9.0),
+            subgroup_meter=None,
+            sends={},
+            insert_order=["EQ", "Compressor", "Limiter"],
+        )
+        self.reorder_calls: list[tuple[str, int, int]] = []
+
+    def reorder_channel_inserts(self, channel_name: str, from_index: int, to_index: int) -> None:
+        self.reorder_calls.append((channel_name, from_index, to_index))
+        order = list(self.state.insert_order)
+        moved = order.pop(from_index)
+        order.insert(to_index, moved)
+        self.state = MixerStripState(
+            name=self.state.name,
+            fader_db=self.state.fader_db,
+            pan=self.state.pan,
+            post_fader_meter=self.state.post_fader_meter,
+            subgroup_meter=self.state.subgroup_meter,
+            sends=self.state.sends,
+            insert_order=order,
+        )
+
+    def strip_state(self, channel_name: str) -> MixerStripState:
+        return self.state
+
+
+def test_mixer_dock_widget_routes_insert_reorder_gestures() -> None:
+    adapter = AdapterStub()
+    controller = MixerDockController(adapter)  # type: ignore[arg-type]
+    dock = MixerDockWidget()
+    dock.bind_controller(controller)
+    state = MixerPanelState(strip_states={"Lead": adapter.state}, master_meter=None)
+    dock.apply_state(state)
+
+    widget = dock._channel_widgets["Lead"]
+    updated_order = widget.request_insert_reorder(0, 2)
+
+    assert adapter.reorder_calls == [("Lead", 0, 2)]
+    assert updated_order == ["Compressor", "Limiter", "EQ"]

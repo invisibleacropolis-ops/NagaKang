@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="960" height="540" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tracker + mixer dock layout with tutorial callouts">
+  <rect width="960" height="540" fill="#10131a" rx="24"/>
+  <rect x="40" y="60" width="520" height="420" fill="#1e2433" stroke="#4cc3ff" stroke-width="3" rx="16"/>
+  <rect x="80" y="100" width="440" height="120" fill="#2a3347" rx="12"/>
+  <rect x="80" y="240" width="440" height="80" fill="#2a3347" rx="12"/>
+  <rect x="80" y="340" width="440" height="100" fill="#2a3347" rx="12"/>
+  <rect x="600" y="60" width="320" height="420" fill="#181f2b" stroke="#ff9b4c" stroke-width="3" rx="16"/>
+  <rect x="620" y="100" width="280" height="320" fill="#222b3c" rx="12"/>
+  <rect x="620" y="440" width="280" height="20" fill="#2f3a4f" rx="10"/>
+  <circle cx="300" cy="70" r="8" fill="#4cc3ff"/>
+  <circle cx="760" cy="70" r="8" fill="#ff9b4c"/>
+  <path d="M300 70 L300 30 L520 30" stroke="#4cc3ff" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+  <path d="M760 70 L760 30 L640 30" stroke="#ff9b4c" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+  <text x="530" y="26" fill="#cfe9ff" font-family="Inter,Segoe UI,Arial" font-size="18" text-anchor="end">Tracker column (transport + grid + loudness)</text>
+  <text x="630" y="26" fill="#ffe1cc" font-family="Inter,Segoe UI,Arial" font-size="18">Mixer dock with reorder gestures</text>
+  <text x="100" y="150" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">TransportControlsWidget</text>
+  <text x="100" y="190" fill="#9fb3d9" font-family="Inter,Segoe UI,Arial" font-size="12">Tutorial tip index + loop slider live-bindings</text>
+  <text x="100" y="280" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">TrackerGridWidget</text>
+  <text x="100" y="380" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">LoudnessTableWidget</text>
+  <text x="640" y="140" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="16">MixerDockWidget</text>
+  <text x="640" y="170" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">MixerStripWidget.request_insert_reorder()</text>
+  <text x="640" y="200" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">MixerDockController.reorder_inserts()</text>
+  <text x="640" y="230" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">Master bus meters mirrored in footer</text>
+  <text x="60" y="500" fill="#cfe9ff" font-family="Inter,Segoe UI,Arial" font-size="14">TrackerMixerRoot now accepts TrackerPanelController + MixerDockController so KV prototypes can drive audio + insert gestures.</text>
+</svg>

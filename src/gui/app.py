@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .mixer_board import MixerDockWidget
+from .mixer_board import MixerDockController, MixerDockWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
 from .state import TrackerMixerLayoutState
 from .tracker_panel import (
@@ -53,14 +53,22 @@ class TrackerMixerRoot(BoxLayout):
     mixer_dock = ObjectProperty(None)
     tracker_column = ObjectProperty(None)
 
-    def __init__(self, tracker_controller: TrackerPanelController | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        tracker_controller: TrackerPanelController | None = None,
+        mixer_controller: MixerDockController | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._orchestrator: PreviewOrchestrator | None = None
         self._clock_event = None
         self._tracker_controller: TrackerPanelController | None = None
+        self._mixer_controller: MixerDockController | None = None
         self._build_default_children()
         if tracker_controller is not None:
             self.bind_tracker_controller(tracker_controller)
+        if mixer_controller is not None:
+            self.bind_mixer_controller(mixer_controller)
 
     def _build_default_children(self) -> None:
         """Instantiate tracker-side widgets so demos run without KV layouts."""
@@ -86,6 +94,13 @@ class TrackerMixerRoot(BoxLayout):
             self.transport_controls.bind_controller(controller)
         if self.tracker_grid is not None:
             self.tracker_grid.bind_controller(controller)
+
+    def bind_mixer_controller(self, controller: MixerDockController) -> None:
+        """Expose mixer dock gestures to an adapter-aware controller."""
+
+        self._mixer_controller = controller
+        if self.mixer_dock is not None:
+            self.mixer_dock.bind_controller(controller)
 
     def bind_orchestrator(self, orchestrator: PreviewOrchestrator, *, interval: float = 0.5) -> None:
         self._orchestrator = orchestrator
@@ -119,14 +134,19 @@ class TrackerMixerApp(App):
         orchestrator: PreviewOrchestrator,
         *,
         tracker_controller: TrackerPanelController | None = None,
+        mixer_controller: MixerDockController | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self._orchestrator = orchestrator
         self._tracker_controller = tracker_controller
+        self._mixer_controller = mixer_controller
 
     def build(self) -> TrackerMixerRoot:
-        root = TrackerMixerRoot(tracker_controller=self._tracker_controller)
+        root = TrackerMixerRoot(
+            tracker_controller=self._tracker_controller,
+            mixer_controller=self._mixer_controller,
+        )
         root.bind_orchestrator(self._orchestrator)
         return root
 
