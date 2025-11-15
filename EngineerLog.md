@@ -1424,3 +1424,42 @@
      transcript into `docs/step8_project_manifest.md`, and publish a checklist
      template musicians can copy when filing autosave/import bug reports.
 
+# Session Summary (Step 8 Import UX Integration & Autosave Evidence – Musician Test Prep)
+- Re-read README §8 plus `docs/step8_project_manifest.md` before touching GUI/state
+  objects so the import-service wiring stayed aligned with the Comprehensive Plan
+  and the previously published persistence contracts. (Plan verification:
+  ~28% ➜ ~29%.)
+- Added `TrackerPanelState` fields for manifest digests, bundle roots, and asset
+  names, extended `TransportControlsWidget` with an `import_summary`, and
+  implemented `TrackerMixerRoot.import_project_bundle(...)` so
+  :class:`ProjectImportService` summaries flow directly into the tracker shell.
+  Import digests now appear alongside autosave prompts, satisfying the GUI half
+  of the "Import UX Integration" TODO. (Step 8 import UX integration completion:
+  ~70% ➜ ~85%.)
+- Documented the new GUI state in README §8 and
+  `docs/step8_project_manifest.md`, updated the documentation index, and added a
+  choir-demo autosave evidence pack under `docs/qa/autosave/` so outside
+  engineers have a reproducible harness transcript plus retained checkpoints for
+  the musician test build. (Step 8 QA hand-off pack completion: ~74% ➜ ~82%; Step
+  8 autosave stress evidence completion: ~78% ➜ ~88%.)
+- Captured the autosave harness JSON + `.autosave/choir_demo` artifacts via the
+  documented script and recorded the output inside the new QA note, giving the
+  release managers concrete pruned-count telemetry for the choir pilot. (Step 8
+  autosave stress evidence completion: ~88% ➜ ~92%.)
+- Expanded the GUI regression suite (`tests/test_gui_preview.py`) to cover the
+  new import workflow and reran `PYTHONPATH=src poetry run pytest` to keep the
+  full suite green. (Regression confidence: ~95% ➜ ~95%.)
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Import UX Integration (~85% ➜ ~92%)**
+   - Thread the new `TrackerPanelState` import metadata into the actual GUI file
+     dialog flow (bundle picker, manifest digest prompts) so the musician demo
+     no longer requires manual controller hooks.
+2. **Step 8 Autosave Stress Evidence (~92% ➜ ~96%)**
+   - Capture an additional harness run that exercises alternate manifest sizes
+     (e.g., percussion bundle) and summarize pruning deltas beside the choir log
+     inside `docs/qa/autosave/`.
+3. **Step 8 QA Hand-off Pack (~82% ➜ ~90%)**
+   - Fold the new import summary screenshots + autosave artifacts into the QA
+     checklist template so testers have a single document covering bundle
+     ingestion, autosave recovery, and reporting expectations.

@@ -102,11 +102,20 @@ to `src/domain/project_manifest.py`. The accompanying export CLI
 the README §8 deliverables actionable for outside engineers preparing bundles
 for QA. The inverse import workflow is now covered by
 `src/domain/project_import_service.py` plus the
-`tools/import_project_bundle.py` CLI, giving testers a checksum-verified path to
-hydrate bundles, copy manifests, and confirm sampler asset parity before
-launching the tracker shell. Reliability drills are supported by
-`tools/autosave_stress_harness.py`, which simulates sustained preview activity
-and reports checkpoint/pruning metrics referenced in the Step 8 QA hand-off pack.
+ `tools/import_project_bundle.py` CLI, giving testers a checksum-verified path to
+ hydrate bundles, copy manifests, and confirm sampler asset parity before
+ launching the tracker shell. Reliability drills are supported by
+ `tools/autosave_stress_harness.py`, which simulates sustained preview activity
+ and reports checkpoint/pruning metrics referenced in the Step 8 QA hand-off pack.
+  `TrackerMixerRoot.import_project_bundle(...)` now wires
+  :class:`ProjectImportService` summaries straight into the tracker shell so GUI
+  operators can hydrate exported bundles, inherit manifest digests, and surface
+  asset availability without leaving the rehearsal build. The transport
+  widgets echo the imported manifest SHA alongside autosave prompts, giving QA
+  immediate confirmation that a crash log references the intended bundle. Real
+  autosave drills for the choir demo live under `docs/qa/autosave/`, pairing the
+  stress-harness JSON summaries with the generated `.autosave/` checkpoints that
+  remote testers will use during the musician pilot.
 9. Performance & Quality Assurance
 Establish benchmarking suite (buffer underrun tests, CPU usage profiling).
 Stress harness outputs are catalogued in `docs/qa/audio_engine_benchmarks.md`, linking benchmark evidence back to this Plan §9 milestone.

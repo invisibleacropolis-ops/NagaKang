@@ -24,6 +24,9 @@ class TrackerPanelState:
     import_dialog_filters: List[Mapping[str, Sequence[str]]] = field(default_factory=list)
     import_asset_count: int = 0
     autosave_recovery_prompt: str | None = None
+    import_manifest_sha256: str | None = None
+    import_bundle_root: str | None = None
+    import_sampler_asset_names: List[str] = field(default_factory=list)
 
 
 @dataclass

@@ -88,6 +88,7 @@ class TransportControlsWidget(BoxLayout):
     onboarding_hint = StringProperty("")
     tutorial_tip_index = NumericProperty(0)
     recovery_prompt = StringProperty("")
+    import_summary = StringProperty("")
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -107,6 +108,10 @@ class TransportControlsWidget(BoxLayout):
             self.tutorial_tip_index = 0
         self._sync_onboarding_hint()
         prompt = state.autosave_recovery_prompt or ""
+        import_summary = self._format_import_summary(state)
+        self.import_summary = import_summary
+        if import_summary:
+            prompt = f"{prompt} | {import_summary}" if prompt else import_summary
         self.recovery_prompt = prompt
 
     def start_playback(
@@ -164,6 +169,20 @@ class TransportControlsWidget(BoxLayout):
             return
         index = int(self.tutorial_tip_index) % len(tips)
         self.onboarding_hint = tips[index]
+
+    def _format_import_summary(self, state: TrackerPanelState) -> str:
+        digest = state.import_manifest_sha256
+        if not digest:
+            return ""
+        digest_hint = digest[:8]
+        asset_count = len(state.import_sampler_asset_names)
+        bundle = state.import_bundle_root
+        summary = f"Import {digest_hint}"
+        if asset_count:
+            summary += f" • {asset_count} assets"
+        if bundle:
+            summary += f" from {bundle}"
+        return summary
 
 
 class TrackerPanelController:
