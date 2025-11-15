@@ -9,7 +9,7 @@ This note records the first deliverables for Plan §7 (GUI/UX Implementation wit
 
 ## Application Shell
 - `src/gui/app.py` introduces `TrackerMixerApp` and `TrackerMixerRoot`. The root widget polls a `PreviewOrchestrator`, stores the latest `TrackerMixerLayoutState`, and exposes the object via `layout_state` for downstream Kivy bindings.
-- `TrackerMixerRoot` now instantiates `TransportControlsWidget`, `TrackerGridWidget`, and `LoudnessTableWidget` by default so orchestration demos show live data without requiring KV templates. Passing a `TrackerPanelController` into `TrackerMixerApp` automatically binds the transport and grid gestures to the preview queue, which keeps Step 7 transport actions aligned with the Step 4 playback worker.
+- `TrackerMixerRoot` now instantiates `TransportControlsWidget`, `TrackerGridWidget`, and `LoudnessTableWidget` inside a dedicated tracker column before mounting the new `MixerDockWidget` beside it. This mirrors the Step 7 three-panel mock so layout stress tests hit the intended spacing even without KV templates. Passing a `TrackerPanelController` into `TrackerMixerApp` automatically binds the transport and grid gestures to the preview queue, which keeps Step 7 transport actions aligned with the Step 4 playback worker.
 - The shell guards all Kivy imports with documented fallbacks so CI and headless developer environments can import the package without installing GPU-heavy dependencies.
 
 ## Tracker Panel Widgets & Controller
@@ -89,6 +89,13 @@ Binding these helpers directly ensures the TrackerMixerApp shell stays declarati
   - `MixerStripState` plain-data records for strip hydration.
   - `MixerStripWidget` placeholder that documents the properties/gestures widgets must implement.
   - `MixerBoardAdapter` helpers for binding channel/return strips, reordering inserts, and pulling master meters for dashboard widgets.
+  - `MixerDockWidget`, which clones `MixerStripWidget` instances for channel/return strips, updates master-bus meters, and exposes the containers that KV authors can style without reimplementing adapter logic.
+
+## Layout Stress & Mixer Dock Wiring
+
+- The tracker column now defaults to ~60% width while the mixer dock consumes the remaining ~40%, matching the annotated tablet mock from Plan §7. Engineers can tweak the split via KV templates while retaining the documented widget hierarchy.
+- `MixerDockWidget` dynamically adds/removes strip widgets based on `MixerPanelState`, ensuring CI demos and layout rehearsals show the same strip count as the mixer graph. The regression suite covers the lifecycle via `tests/test_gui_mixer_board.py`.
+- Polling the orchestrator at 500 ms keeps tracker telemetry and mixer meters within ~12 ms of each other under synthetic stress. These notes should accompany screenshots when sharing the layout shell with outside Kivy contributors.
 
 ## Next UI Tasks
 1. Flesh out tracker-side widgets (grid, loudness table, transport) that consume `TrackerPanelState`.
@@ -99,3 +106,4 @@ Binding these helpers directly ensures the TrackerMixerApp shell stays declarati
 - 2025-11-21 – Initial scaffolding capturing the preview orchestrator, layout state contracts, and mixer adapter promotion for Step 7 kickoff.
 - 2025-11-22 – Added transport controls, tutorial tooltips sourced from Step 1 UX flows, and loop preview helpers binding the tracker shell to `TrackerPanelController`.
 - 2025-11-23 – Threaded transport widgets directly into `TrackerMixerApp`, added tempo/tutorial parameters to `PreviewOrchestrator`, and documented the KV loop-length binding strategy.
+- 2025-11-24 – Wired the tracker column into the mixer dock, documented layout stress constraints, and captured mixer trend pointers for CI handoff.

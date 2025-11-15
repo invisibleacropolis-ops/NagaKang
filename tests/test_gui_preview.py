@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-import pytest
-
 from audio.engine import EngineConfig, TempoMap
-from audio.mixer import MixerChannel, MixerGraph
+from audio.mixer import MeterReading, MixerChannel, MixerGraph
 from audio.modules import SineOscillator
 from audio.tracker_bridge import PatternPerformanceBridge
 from domain.models import InstrumentDefinition, InstrumentModule, Pattern, PatternStep
 from gui.app import TrackerMixerRoot
-from gui.mixer_board import MixerBoardAdapter
+from gui.mixer_board import MixerBoardAdapter, MixerStripState
 from gui.preview import PreviewBatchState, PreviewOrchestrator
 from gui.state import MixerPanelState, TrackerMixerLayoutState, TrackerPanelState
 from gui.tracker_panel import TrackerPanelController
@@ -101,9 +99,23 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
         loop_window_steps=2.0,
         tutorial_tips=["Loop the intro fill"],
     )
+    mixer_state = MixerPanelState(
+        strip_states={
+            "Lead": MixerStripState(
+                name="Lead",
+                fader_db=-3.0,
+                pan=0.0,
+                post_fader_meter=MeterReading(-6.0, -9.0),
+                subgroup_meter=None,
+                sends={},
+                insert_order=[],
+            )
+        },
+        master_meter=MeterReading(-1.0, -4.0),
+    )
     layout = TrackerMixerLayoutState(
         tracker=tracker_state,
-        mixer=MixerPanelState(),
+        mixer=mixer_state,
     )
     batch = PreviewBatchState(layout=layout, previews=[])
 
@@ -126,6 +138,8 @@ def test_tracker_mixer_root_binds_orchestrator() -> None:
     assert root.transport_controls.loop_window_steps == pytest.approx(2.0)
     assert root.tracker_grid.pattern_id == pattern.id
     assert not service.queue
+    assert root.mixer_dock.master_peak_db == pytest.approx(-1.0)
+    assert root.mixer_dock.strip_container.children
 
     playback_requests = root.transport_controls.start_playback()
 

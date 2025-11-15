@@ -1,0 +1,57 @@
+{
+  "channel_groups": {
+    "Kick": "drums",
+    "Vocals": "band"
+  },
+  "channel_post_meters": {
+    "Kick": {
+      "peak_db": -2.4987747321659985,
+      "rms_db": -2.4987747321659985
+    },
+    "Vocals": {
+      "peak_db": -5.192746021853537,
+      "rms_db": -5.192746021853537
+    }
+  },
+  "subgroup_meters": {
+    "drums": {
+      "peak_db": -5.498775225233072,
+      "rms_db": -5.498775225233072
+    },
+    "band": {
+      "peak_db": 0.6761870076089354,
+      "rms_db": 0.6761870076089354
+    }
+  },
+  "automation_events": [
+    {
+      "time_seconds": 0.0,
+      "module": "mixer:subgroup:band",
+      "parameter": "fader_db",
+      "value": -3.0,
+      "source": "cli_demo"
+    },
+    {
+      "time_seconds": 0.0,
+      "module": "mixer:subgroup:band",
+      "parameter": "fader_db",
+      "value": 0.0,
+      "source": "cli_demo"
+    },
+    {
+      "time_seconds": 0.05,
+      "module": "mixer:channel:Vocals",
+      "parameter": "send:vox_delay",
+      "value": -6.0,
+      "source": "cli_demo"
+    }
+  ],
+  "return_levels": {
+    "drum_room": -4.0,
+    "vox_delay": -9.0
+  },
+  "master_meter": {
+    "peak_db": 2.3883642328236605,
+    "rms_db": 2.3883642328236605
+  }
+}

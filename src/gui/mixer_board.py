@@ -3,19 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Mapping
+from typing import Dict, List, Mapping, MutableMapping, TYPE_CHECKING, Type
 
 from audio.mixer import MeterReading, MixerGraph
 
 try:  # pragma: no cover - optional dependency for docs and runtime shell
-    from kivy.properties import BooleanProperty, DictProperty, ListProperty, NumericProperty, StringProperty
+    from kivy.properties import BooleanProperty, DictProperty, ListProperty, NumericProperty, ObjectProperty, StringProperty
     from kivy.uix.boxlayout import BoxLayout
 except Exception:  # pragma: no cover - fallback keeps type checkers and tests happy
     class BoxLayout:  # type: ignore
         """Minimal stand-in when Kivy is unavailable (e.g., CI)."""
 
-        def __init__(self, **_kwargs) -> None:  # pragma: no cover - trivial
+        def __init__(self, **kwargs) -> None:  # pragma: no cover - trivial
             super().__init__()
+            self.children: List[object] = []
+            self.orientation = kwargs.get("orientation", "horizontal")
+
+        def add_widget(self, widget) -> None:  # pragma: no cover - fallback helper
+            self.children.append(widget)
+
+        def remove_widget(self, widget) -> None:  # pragma: no cover - fallback helper
+            if widget in self.children:
+                self.children.remove(widget)
 
     def BooleanProperty(default: bool = False):  # type: ignore
         return bool(default)
@@ -31,6 +40,13 @@ except Exception:  # pragma: no cover - fallback keeps type checkers and tests h
 
     def ListProperty(default=None):  # type: ignore
         return list(default or [])
+
+    def ObjectProperty(default=None):  # type: ignore
+        return default
+
+
+if TYPE_CHECKING:  # pragma: no cover - typing aid only
+    from .state import MixerPanelState
 
 
 @dataclass
@@ -174,3 +190,67 @@ class MixerBoardAdapter:
 
     def master_meter(self) -> MeterReading:
         return self._graph.master_meter
+
+
+class MixerDockWidget(BoxLayout):
+    """Container widget that mirrors mixer panel state for the layout shell."""
+
+    master_peak_db = NumericProperty(-120.0)
+    master_rms_db = NumericProperty(-120.0)
+    strip_container = ObjectProperty(None)
+    return_container = ObjectProperty(None)
+
+    def __init__(
+        self,
+        *,
+        strip_factory: Type[MixerStripWidget] | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        if getattr(self, "orientation", None) is None:
+            self.orientation = "horizontal"
+        self._strip_factory = strip_factory or MixerStripWidget
+        self._channel_widgets: MutableMapping[str, MixerStripWidget] = {}
+        self._return_widgets: MutableMapping[str, MixerStripWidget] = {}
+        self.strip_container = self._build_container()
+        self.return_container = self._build_container()
+        self.add_widget(self.strip_container)
+        self.add_widget(self.return_container)
+
+    def _build_container(self) -> BoxLayout:
+        return BoxLayout(orientation="vertical")
+
+    def apply_state(self, state: "MixerPanelState") -> None:
+        self._sync_widgets(state.strip_states, self._channel_widgets, self.strip_container)
+        self._sync_widgets(state.return_states, self._return_widgets, self.return_container)
+        if state.master_meter is None:
+            self.master_peak_db = -float("inf")
+            self.master_rms_db = -float("inf")
+        else:
+            self.master_peak_db = state.master_meter.peak_db
+            self.master_rms_db = state.master_meter.rms_db
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _sync_widgets(
+        self,
+        states: Mapping[str, MixerStripState],
+        widgets: MutableMapping[str, MixerStripWidget],
+        container: BoxLayout,
+    ) -> None:
+        seen = set()
+        for name, strip_state in states.items():
+            seen.add(name)
+            widget = widgets.get(name)
+            if widget is None:
+                widget = self._strip_factory()
+                widgets[name] = widget
+                if hasattr(container, "add_widget"):
+                    container.add_widget(widget)
+            widget.apply_state(strip_state)
+        for name in list(widgets):
+            if name not in seen:
+                widget = widgets.pop(name)
+                if hasattr(container, "remove_widget"):
+                    container.remove_widget(widget)
