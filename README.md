@@ -87,11 +87,17 @@ Pinch/zoom, multi-select, parameter tweaking, piano-roll style gestures.
 Create consistent theming (light/dark modes, scalable vector graphics).
 Implement responsive layout logic for different screen sizes.
 Add onboarding tutorials, tooltips, context-sensitive help.
+Status: Completed – see `docs/step7_gui_shell.md` for the orchestrator, widget
+contracts, mixer insert gesture QA plan, and links to the regression suites
+that now gate GUI releases.
 8. Project & Asset Management
 Define project directory structure and asset pipeline (samples, presets).
 Implement file dialogs, import/export (instruments, patterns, audio files).
 Support sample recording and editing (basic waveform editor).
 Create versioned autosave, crash recovery, and backup system.
+The manifest schema, sampler transfer workflow, and autosave expectations for
+this milestone now live in `docs/step8_project_manifest.md` alongside references
+to `src/domain/project_manifest.py`.
 9. Performance & Quality Assurance
 Establish benchmarking suite (buffer underrun tests, CPU usage profiling).
 Stress harness outputs are catalogued in `docs/qa/audio_engine_benchmarks.md`, linking benchmark evidence back to this Plan §9 milestone.

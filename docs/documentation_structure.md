@@ -12,13 +12,14 @@ This index formalizes how project documentation is organized so contributors can
 - `docs/step6_mixer_kickoff.md` – Effects/routing kickoff documenting mixer graph primitives, auxiliary routing tests, and Kivy layout strategy per Plan §6.
 - `docs/step6_mixer_kivy_mock.py` – Prototype MixerGraph → Kivy adapter illustrating strip state binding, subgroup metering, return-bus presets, and insert reordering affordances.
 - `docs/step7_gui_shell.md` – Step 7 kickoff covering the preview orchestrator, tracker/mixer layout contracts, tracker grid & loudness widgets, transport/tutorial bindings, widget adapters promoted from the mock into production, plus the insert-gesture QA guidance and Step 8 preview tasks added during the milestone closure.
+- `docs/step8_project_manifest.md` – Step 8 kickoff capturing the manifest schema, sampler asset transfer workflow, autosave cadence, and the outstanding persistence tasks referenced by README §8.
 - `tools/mixer_diagnostics.py` – CLI for rendering the Step 6 demo graph, exporting subgroup meters, return levels, and mixer automation events for QA.
 - `docs/qa/artifacts/mixer_trends/README.md` – Mixer trend artifact workflow tying `mixer_trend_ci.py` outputs to the shared audio reference pack and CI publishing expectations.
 - `docs/assets/` – Source-controlled Mermaid files for architecture diagrams (component, sequence, failure-mode, controller routing) referenced by `docs/step2_architecture_diagrams.md`, plus future exported visuals. UI captures such as `docs/assets/ui/transport_strip_annotations.svg` and `docs/assets/ui/tracker_mixer_three_panel.svg` document Step 7 bindings for external designers.
 - `docs/qa/` – Benchmark and QA artifacts (e.g., audio stress harness tables) that evidence progress on Plan §9 instrumentation goals. The canonical stress harness configuration lives in `docs/qa/stress_plan.json` with exported summaries stored in `docs/qa/artifacts/`.
 - `tools/publish_diagrams.py` – Scriptable Mermaid-to-SVG pipeline used to keep `docs/step2_architecture_diagrams.md` in sync with rendered assets.
 - `tools/mixer_trend_ci.py` – CI helper that captures mixer diagnostics summaries, diffs them against the committed baseline, appends Markdown/JSON history entries for QA releases, and records SHA-256 digests plus sampler-manifest metadata for parity checks.
-- `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap.
+- `src/domain/` – Production-ready data models, repository abstractions, and persistence helpers superseding the prototypes per Step 2 roadmap. `src/domain/project_manifest.py` now documents the manifest schema and sampler import/export helpers referenced by Step 8.
 - `.github/workflows/ci.yml` – Continuous integration pipeline invoking Poetry, Ruff, Mypy, and Pytest for baseline quality gates.
 - `pyproject.toml` – Poetry configuration defining dependencies, lint/type-check tooling, and pytest defaults.
 - `README.md` – Comprehensive development plan overview and onboarding context.
@@ -74,3 +75,4 @@ Record noteworthy benchmark outputs or failure diagnostics under `docs/qa/` to s
 - 2025-11-18 – Added stress harness trend comparison workflow, S3 smoke test utility, and Mermaid CLI version pinning guidance.
 - 2025-11-19 – Documented the Step 3 audio engine kickoff, .env-based staging smoke test workflow, and Puppeteer cache reuse in CI.
 - 2025-11-24 – Added mixer trend artifact references, S3 sampler manifest pointers, and the `mixer_trend_ci.py` runbook entry for CI instrumentation.
+- 2025-11-26 – Documented the Step 8 manifest/autosave kickoff and linked the new domain helpers plus README references.
