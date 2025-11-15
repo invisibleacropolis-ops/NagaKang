@@ -1,3 +1,36 @@
+# Session Summary (Step 7 QA Sign-off & Step 8 Manifest Kickoff – Project & Asset Management)
+- Re-read README §7, Step 7 mixer/mixer trend docs, and the Comprehensive Plan
+  before editing any artifacts so the GUI milestone remains frozen for the
+  upcoming musician tests. Added a "Status: Completed" callout to README §7 so
+  outside engineers land on `docs/step7_gui_shell.md` when validating the
+  release candidate. (Plan verification: ~24% ➜ ~26%.)
+- Authored `docs/step8_project_manifest.md` and linked it via
+  `docs/documentation_structure.md`, capturing the manifest schema, autosave
+  cadence, crash-recovery checkpoints, and Next Steps for persistence. README
+  §8 now references the doc so QA and tooling contributors can follow a single
+  source. (Step 8 documentation kickoff: ~0% ➜ ~35%.)
+- Implemented `src/domain/project_manifest.py` with `ProjectManifestBuilder`,
+  `SamplerManifestIndex`, checksum helpers, and import-plan scaffolding. Added
+  `tests/test_domain_project_manifest.py` to validate manifest assembly,
+  checksum enforcement, and file-dialog filter generation. (Step 8 manifest
+  schema completion: ~0% ➜ ~45%; Step 8 import/export automation: ~0% ➜ ~25%.)
+- Ran `poetry run pytest` to keep the GUI, mixer, tracker, tooling, and new
+  manifest suites green before releasing to musician testers. (Regression
+  confidence: ~93% ➜ ~94%.)
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Project Export Service (~45% ➜ ~65%)**
+   - Build a CLI/utility that serializes patterns, mixer snapshots, sampler
+     assets, and manifests in one shot, wiring it into README §8 plus the new
+     doc.
+2. **Step 8 Import UX & File Dialog Integration (~25% ➜ ~45%)**
+   - Thread `SamplerManifestIndex` into the Kivy shell, surface the dialog
+     filters recorded today, and log transfers inside autosave checkpoints.
+3. **Step 8 Autosave Implementation (~35% ➜ ~55%)**
+   - Wire the 90-second autosave cadence and crash checkpoints into
+     `TrackerMixerRoot`, persist manifests under `.autosave/`, and expose the
+     recovery prompt via the transport/tutorial column.
+
 # Session Summary (Step 7 Documentation Closure & QA Hooks – GUI/UX Implementation)
 - Re-read README §7 plus the mixer trend CI runbook to make sure the remaining Step 7 obligations (gesture documentation, parity notes) were satisfied before editing the docs. (Plan verification: ~22% ➜ ~24%.)
 - Expanded `docs/step7_gui_shell.md` with a "Gesture QA & CI Parity" section, promoted the Step 8 preview tasks into the Next Steps list, and recorded a closure entry in the update history so external engineers have a definitive reference for the finished Step 7 shell. (Step 7 documentation traceability: ~95% ➜ ~100%.)
@@ -1310,3 +1343,4 @@
    - Capture the new three-panel layout (tracker column + mixer dock) with annotated onboarding callouts for docs/marketing so external GUI partners can reference concrete visuals.
 3. **CI Artifact Parity Checks (~0% ➜ 25%)**
    - Extend the CI helper to attach SHA-256 digests for mixer trend outputs and cross-link them with the sampler manifest so QA can confirm artifacts haven’t drifted between stress harness and mixer runs.
+
