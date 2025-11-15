@@ -19,7 +19,10 @@ poetry run python tools/mixer_trend_ci.py \
 - `latest_summary.json` and `latest_summary.md` are published as workflow
   artifacts so UI/audio engineers can diff levels without downloading WAVs.
   Their SHA-256 digests are recorded in the Markdown summary and history entries
-  so QA can prove parity between CI downloads and mirrored archives.
+  so QA can prove parity between CI downloads and mirrored archives. The
+  `sampler_s3_manifest.json` digest is logged alongside those entries so mixer
+  metrics and the Step 3/4 reference renders can be matched during investigations
+  without re-downloading the audio pack.
 - The `baseline/` snapshot is checked in and only refreshed after confirming the
   deltas are intentional. Running the command with `--write-baseline` will update
   the file locally.

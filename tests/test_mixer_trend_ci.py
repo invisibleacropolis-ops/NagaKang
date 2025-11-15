@@ -36,6 +36,7 @@ def test_mixer_trend_ci_generates_markdown_and_history(tmp_path):
     assert "Mixer Trend Snapshot" in markdown_text
     assert "Artifact digests" in markdown_text
     assert "Sampler manifest linkage" in markdown_text
+    assert "Sampler manifest digest recorded" in markdown_text
 
     exit_code = mixer_trend_ci.main(
         [
@@ -65,3 +66,4 @@ def test_mixer_trend_ci_generates_markdown_and_history(tmp_path):
     assert "follow-up" in history_md
     assert history_entries[-1]["artifact_digests"]
     assert "sampler_manifest" in history_entries[-1]
+    assert "docs/assets/audio/sampler_s3_manifest.json" in history_entries[-1]["artifact_digests"]

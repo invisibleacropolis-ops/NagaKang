@@ -5,6 +5,7 @@ from .mixer_board import (
     MixerBoardAdapter,
     MixerDockController,
     MixerDockWidget,
+    MixerInsertGestureModel,
     MixerStripState,
     MixerStripWidget,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "MixerStripState",
     "MixerStripWidget",
     "MixerDockWidget",
+    "MixerInsertGestureModel",
     "PreviewBatchState",
     "PreviewOrchestrator",
     "TrackerPanelState",

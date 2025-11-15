@@ -51,6 +51,8 @@ def build_markdown(
     lines.append("## Stored artifacts")
     lines.append("- JSON summary: included alongside CI artifacts")
     lines.append("- Audio render pointers: see `docs/assets/audio/sampler_s3_manifest.json`")
+    if manifest_summary:
+        lines.append("- Sampler manifest digest recorded with mixer artifacts for parity checks")
     if artifact_digests:
         lines.append("- SHA-256 digests: recorded below for parity checks")
     if diff:
@@ -174,6 +176,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(summary_payload)
     artifact_digests[args.output_json.name] = sha256_digest(summary_payload.encode("utf-8"))
+    if manifest_summary:
+        artifact_digests[manifest_summary["path"]] = manifest_summary.get("sha256", "--")
     markdown_payload = build_markdown(
         summary_data,
         diff,

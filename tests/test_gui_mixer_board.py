@@ -1,8 +1,11 @@
 from audio.mixer import MeterReading
 
-from audio.mixer import MeterReading
-
-from gui.mixer_board import MixerDockController, MixerDockWidget, MixerStripState
+from gui.mixer_board import (
+    MixerDockController,
+    MixerDockWidget,
+    MixerInsertGestureModel,
+    MixerStripState,
+)
 from gui.state import MixerPanelState
 
 
@@ -121,3 +124,41 @@ def test_mixer_dock_widget_routes_insert_reorder_gestures() -> None:
 
     assert adapter.reorder_calls == [("Lead", 0, 2)]
     assert updated_order == ["Compressor", "Limiter", "EQ"]
+
+
+def test_mixer_insert_gesture_model_previews_and_commits() -> None:
+    adapter = AdapterStub()
+    controller = MixerDockController(adapter)  # type: ignore[arg-type]
+    dock = MixerDockWidget()
+    dock.bind_controller(controller)
+    state = MixerPanelState(strip_states={"Lead": adapter.state}, master_meter=None)
+    dock.apply_state(state)
+    model = MixerInsertGestureModel(dock)
+
+    start_order = model.begin_drag("Lead", 1)
+    assert start_order == ["EQ", "Compressor", "Limiter"]
+
+    preview = model.preview_to(0)
+    assert preview == ["Compressor", "EQ", "Limiter"]
+    assert dock._channel_widgets["Lead"].insert_order == preview
+
+    committed = model.commit()
+    assert committed == preview
+    assert adapter.reorder_calls[-1] == ("Lead", 1, 0)
+
+
+def test_mixer_insert_gesture_model_cancel_restores_original_order() -> None:
+    adapter = AdapterStub()
+    controller = MixerDockController(adapter)  # type: ignore[arg-type]
+    dock = MixerDockWidget()
+    dock.bind_controller(controller)
+    state = MixerPanelState(strip_states={"Lead": adapter.state}, master_meter=None)
+    dock.apply_state(state)
+    model = MixerInsertGestureModel(dock)
+
+    model.begin_drag("Lead", 2)
+    model.preview_to(0)
+    restored = model.cancel()
+
+    assert restored == ["EQ", "Compressor", "Limiter"]
+    assert dock._channel_widgets["Lead"].insert_order == ["EQ", "Compressor", "Limiter"]

@@ -16,11 +16,15 @@
   <text x="630" y="26" fill="#ffe1cc" font-family="Inter,Segoe UI,Arial" font-size="18">Mixer dock with reorder gestures</text>
   <text x="100" y="150" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">TransportControlsWidget</text>
   <text x="100" y="190" fill="#9fb3d9" font-family="Inter,Segoe UI,Arial" font-size="12">Tutorial tip index + loop slider live-bindings</text>
+  <text x="100" y="210" fill="#9fb3d9" font-family="Inter,Segoe UI,Arial" font-size="12">TransportControlsWidget.advance_tutorial_hint()</text>
+  <text x="100" y="230" fill="#9fb3d9" font-family="Inter,Segoe UI,Arial" font-size="12">Loop slider ↔ set_loop_window_steps()</text>
   <text x="100" y="280" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">TrackerGridWidget</text>
   <text x="100" y="380" fill="#8dd0ff" font-family="Inter,Segoe UI,Arial" font-size="16">LoudnessTableWidget</text>
+  <text x="100" y="405" fill="#9fb3d9" font-family="Inter,Segoe UI,Arial" font-size="12">Annotated LUFS rows mirror docs/tutorials</text>
   <text x="640" y="140" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="16">MixerDockWidget</text>
   <text x="640" y="170" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">MixerStripWidget.request_insert_reorder()</text>
   <text x="640" y="200" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">MixerDockController.reorder_inserts()</text>
-  <text x="640" y="230" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">Master bus meters mirrored in footer</text>
+  <text x="640" y="230" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">MixerInsertGestureModel preview/commit/cancel</text>
+  <text x="640" y="255" fill="#ffd7b0" font-family="Inter,Segoe UI,Arial" font-size="12">Master bus meters mirrored in footer</text>
   <text x="60" y="500" fill="#cfe9ff" font-family="Inter,Segoe UI,Arial" font-size="14">TrackerMixerRoot now accepts TrackerPanelController + MixerDockController so KV prototypes can drive audio + insert gestures.</text>
 </svg>

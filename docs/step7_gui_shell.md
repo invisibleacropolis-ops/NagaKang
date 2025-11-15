@@ -108,6 +108,42 @@ Binding these helpers directly ensures the TrackerMixerApp shell stays declarati
 
 The annotated capture above is bundled in `docs/assets/ui/tracker_mixer_three_panel.svg`. Share this reference with design partners so they can compare live screenshots to the documented spacing ratios and onboarding callouts.
 
+### Drag helper for KV bindings
+
+- `MixerInsertGestureModel` wraps `MixerDockWidget` so KV authors can stage drag gestures without replicating controller logic. Call `begin_drag(channel, index)` when the user grabs an insert handle, `preview_to(target_index)` as the pointer crosses drop zones, and `commit()` once the drag is released. The helper mirrors preview order back into the strip widget via `MixerDockWidget.preview_insert_order(...)`, making it obvious where the insert will land before the backend mutates state.
+- `cancel()` reverts the widget to its original order and clears the drag context, which keeps long-press menus or drag-cancel gestures deterministic.
+
+#### Example KV binding
+
+```kv
+#:kivy 2.3.0
+<InsertList@BoxLayout>:
+    channel_name: "Lead"
+    gesture: app.insert_gesture
+    RecycleView:
+        id: insert_view
+        viewclass: "InsertRow"
+        data: [{"text": name} for name in root.gesture.dock.insert_order_for_channel(root.channel_name)]
+    on_touch_down:
+        if self.collide_point(*args[1].pos): root.gesture.begin_drag(root.channel_name, int(args[1].y // 24))
+    on_touch_move:
+        if root.gesture: root.gesture.preview_to(int(args[1].y // 24))
+    on_touch_up:
+        root.gesture.commit()
+```
+
+The pseudo-binding above highlights how KV authors can bridge pointer events to the new helper without reimplementing mixer adapters. Production layouts can replace the simplistic `int(args[1].y // 24)` math with proper list index resolution or gesture recognizers.
+
+## Three-Panel Tutorial Reference
+
+The refreshed `assets/ui/tracker_mixer_three_panel.svg` now annotates:
+
+- Transport onboarding copy (`TransportControlsWidget` tutorial tip index and loop slider bindings).
+- Tracker grid + loudness cards with the same gradient callouts we use in rehearsal decks.
+- Mixer dock drag handles tied to `MixerInsertGestureModel`, clarifying where drop zones exist and how reorder gestures feed the adapter/controller stack.
+
+This single capture replaces the older storyboard so marketing/QA can reuse one asset when explaining tracker tutorials, mixer insert gestures, and the three-panel Step 7 layout stress expectations.
+
 ## Next UI Tasks
 1. Flesh out tracker-side widgets (grid, loudness table, transport) that consume `TrackerPanelState`.
 2. Bind return/insert gestures in KV language, referencing the adapter helpers documented above.

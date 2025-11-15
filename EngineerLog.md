@@ -1,3 +1,39 @@
+# Session Summary (Step 7 Gesture Preview & Artifact Parity Closure – GUI/UX Implementation)
+- Re-read README §7 plus the mixer trend runbook to reconfirm the outstanding
+  Step 7 deliverables (insert gestures, tutorial screenshots, CI parity) before
+  touching widgets, docs, or tooling. (Plan verification: ~20% ➜ ~22%.)
+- Implemented `MixerInsertGestureModel`, added preview/cancel helpers on
+  `MixerDockWidget`, and expanded `tests/test_gui_mixer_board.py` so insert drag
+  gestures can be staged, previewed, and committed entirely from KV bindings.
+  (Step 7 mixer gesture prototypes completion: ~20% ➜ ~100%.)
+- Refreshed `docs/assets/ui/tracker_mixer_three_panel.svg`, documented the new
+  drag helper and tutorial callouts inside `docs/step7_gui_shell.md`, and
+  published KV snippets for insert reorder bindings so external GUI partners get
+  a screenshot plus code path for the three-panel layout. (Step 7 tutorial
+  screenshot/documentation completion: ~60% ➜ ~100%.)
+- Extended `tools/mixer_trend_ci.py` with manifest digest tracking, updated
+  `docs/qa/artifacts/mixer_trends/README.md`, and bolstered
+  `tests/test_mixer_trend_ci.py` so mixer trend artifacts now carry SHA-256
+  digests for JSON/Markdown outputs *and* the sampler manifest, allowing QA to
+  confirm parity between mixer telemetry and audio renders. (CI artifact parity
+  checks completion: ~30% ➜ ~100%.)
+- Ran `poetry run pytest` to keep GUI, mixer, tracker, and tooling suites green
+  after the Step 7 closure work.
+
+## Outstanding TODOs / Next Session Goals
+1. **Step 8 Project Manifest Schema (~0% ➜ ~15%)**
+   - Define the on-disk project manifest (tracker patterns, mixer snapshots,
+     sampler assets) with versioned JSON schemas plus README §8 references so
+     designers can trade projects without reverse-engineering folder layouts.
+2. **Step 8 Import/Export Automation (~0% ➜ ~12%)**
+   - Prototype file-dialog hooks and import/export helpers that copy samples via
+     the sampler manifest hashes, capturing LUFS metadata and checksums alongside
+     each transfer for QA traceability.
+3. **Step 8 Autosave & Recovery Notes (~0% ➜ ~10%)**
+   - Sketch autosave cadence, crash-recovery checkpoints, and backup naming
+     scheme for the tracker/mixer shell so persistence tasks can begin with
+     documented expectations.
+
 # Session Summary (Step 7 Mixer Gestures & CI Parity – GUI/UX Implementation)
 - Re-read README §7 and the mixer QA artifact checklist to confirm that the
   outstanding Step 7 deliverables focused on insert gestures, tutorial
