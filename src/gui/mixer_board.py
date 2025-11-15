@@ -121,6 +121,17 @@ class MixerStripWidget(BoxLayout):
         return list(self.insert_order)
 
 
+@dataclass
+class _InsertDragState:
+    """Internal preview state for mixer insert drag gestures."""
+
+    channel_name: str
+    from_index: int
+    target_index: int
+    original_order: List[str]
+    preview_order: List[str]
+
+
 class MixerBoardAdapter:
     """View-model translating :class:`MixerGraph` state for the GUI shell."""
 
@@ -272,6 +283,22 @@ class MixerDockWidget(BoxLayout):
             widget.apply_state(new_state)
         return list(new_state.insert_order)
 
+    def insert_order_for_channel(self, channel_name: str) -> List[str]:
+        """Expose the current insert order for gesture previews."""
+
+        widget = self._channel_widgets.get(channel_name)
+        if widget is None:
+            raise KeyError(f"Unknown mixer channel: {channel_name}")
+        return list(widget.insert_order)
+
+    def preview_insert_order(self, channel_name: str, order: List[str]) -> None:
+        """Update a strip widget to reflect a drag preview order."""
+
+        widget = self._channel_widgets.get(channel_name)
+        if widget is None:
+            return
+        widget.insert_order = list(order)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -329,3 +356,78 @@ class MixerDockController:
     def reorder_inserts(self, channel_name: str, from_index: int, to_index: int) -> MixerStripState:
         self._adapter.reorder_channel_inserts(channel_name, from_index, to_index)
         return self._adapter.strip_state(channel_name)
+
+
+class MixerInsertGestureModel:
+    """Lightweight drag helper that mirrors insert reorders into the dock."""
+
+    def __init__(self, dock: MixerDockWidget) -> None:
+        self._dock = dock
+        self._drag_state: _InsertDragState | None = None
+
+    def begin_drag(self, channel_name: str, from_index: int) -> List[str]:
+        """Record the starting order for a drag gesture."""
+
+        order = self._dock.insert_order_for_channel(channel_name)
+        if not 0 <= from_index < len(order):
+            raise IndexError("Insert index is out of range for the channel")
+        state = _InsertDragState(
+            channel_name=channel_name,
+            from_index=from_index,
+            target_index=from_index,
+            original_order=list(order),
+            preview_order=list(order),
+        )
+        self._drag_state = state
+        return list(order)
+
+    def preview_to(self, target_index: int) -> List[str]:
+        """Preview where the dragged insert will land before committing."""
+
+        state = self._require_state()
+        preview = self._build_preview(state.original_order, state.from_index, target_index)
+        state.target_index = self._clamp_target(target_index, len(state.original_order))
+        state.preview_order = list(preview)
+        self._dock.preview_insert_order(state.channel_name, preview)
+        return list(preview)
+
+    def commit(self) -> List[str]:
+        """Apply the drag gesture by calling back into the dock controller."""
+
+        state = self._require_state()
+        updated = self._dock.request_insert_reorder(
+            state.channel_name,
+            state.from_index,
+            state.target_index,
+        )
+        self._drag_state = None
+        return list(updated)
+
+    def cancel(self) -> List[str]:
+        """Abort the drag gesture and restore the original order."""
+
+        state = self._drag_state
+        if state is None:
+            return []
+        self._dock.preview_insert_order(state.channel_name, state.original_order)
+        self._drag_state = None
+        return list(state.original_order)
+
+    def _require_state(self) -> _InsertDragState:
+        if self._drag_state is None:
+            raise RuntimeError("Drag has not been started")
+        return self._drag_state
+
+    def _build_preview(self, order: List[str], from_index: int, target_index: int) -> List[str]:
+        preview = list(order)
+        moved = preview.pop(from_index)
+        clamped = self._clamp_target(target_index, len(order))
+        preview.insert(clamped, moved)
+        return preview
+
+    @staticmethod
+    def _clamp_target(index: int, order_length: int) -> int:
+        if order_length <= 0:
+            return 0
+        max_index = max(order_length - 1, 0)
+        return max(0, min(index, max_index))
