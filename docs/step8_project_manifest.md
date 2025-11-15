@@ -221,6 +221,24 @@ restore projects. The transport/tutorial column now displays the most recent
 autosave prompt ("Autosaved demo at 20251127-153000") via
 `TransportControlsWidget.recovery_prompt`.
 
+`TrackerMixerRoot.import_project_bundle(...)` wraps
+:class:`domain.project_import_service.ProjectImportService`, copying manifests,
+patterns, and sampler assets into a destination directory before surfacing the
+result inside `TrackerPanelState`. The tracker state now exposes
+`import_manifest_sha256`, `import_bundle_root`, and
+`import_sampler_asset_names`, letting GUI bindings display digest/asset details
+without querying the CLI JSON directly. `TransportControlsWidget` mirrors this
+information via the new `import_summary` property and automatically appends it
+to the autosave prompt so QA logs record both the checkpoint timestamp and the
+bundle digest that was loaded moments before a crash drill.
+
+`docs/qa/autosave/README.md` captures a real `tools/autosave_stress_harness.py`
+run against the choir demo manifest. The JSON summary exported by the harness
+(`docs/qa/autosave/runs/choir_demo_summary.json`) sits beside the generated
+`.autosave/choir_demo/` checkpoints so QA leads can download one folder and
+verify pruned-count telemetry against the layout/manifest copies referenced by
+the transport prompt.
+
 ## Next Steps
 1. Implement a dedicated `ProjectExportService` that serializes patterns,
    mixer snapshots, and manifest metadata in a single CLI command for QA.

@@ -8,15 +8,15 @@ import json
 from pathlib import Path
 import shutil
 import time
-from typing import Any, Callable, Deque, List
+from typing import Any, Callable, Deque, List, Mapping, Sequence
 
 from domain.project_manifest import (
-    ProjectImportPlan,
     ProjectManifest,
     SamplerManifestIndex,
     build_import_plan,
     compute_file_sha256,
 )
+from domain.project_import_service import ProjectImportResult, ProjectImportService
 
 from .mixer_board import MixerDockController, MixerDockWidget
 from .preview import PreviewBatchState, PreviewOrchestrator
@@ -99,7 +99,10 @@ class TrackerMixerRoot(BoxLayout):
             self.bind_tracker_controller(tracker_controller)
         if mixer_controller is not None:
             self.bind_mixer_controller(mixer_controller)
-        self._import_plan: ProjectImportPlan | None = None
+        self._import_dialog_filters: List[Mapping[str, Sequence[str]]] = []
+        self._import_asset_count = 0
+        self._import_service = ProjectImportService()
+        self._last_import_result: ProjectImportResult | None = None
         self._sampler_manifest: SamplerManifestIndex | None = None
         self._manifest_path: Path | None = None
         self._autosave_config: _AutosaveConfig | None = None
@@ -145,9 +148,39 @@ class TrackerMixerRoot(BoxLayout):
         """Capture sampler manifest metadata for import dialogs and autosave."""
 
         self._sampler_manifest = manifest
-        self._import_plan = build_import_plan(manifest)
+        plan = build_import_plan(manifest)
+        self._import_dialog_filters = list(plan.dialog_filters)
+        self._import_asset_count = plan.asset_count
         if manifest_path is not None:
             self._manifest_path = Path(manifest_path)
+
+    def import_project_bundle(
+        self,
+        bundle_root: Path,
+        *,
+        destination_root: Path | None = None,
+        manifest_filename: str = "project_manifest.json",
+        project_filename: str = "project.json",
+    ) -> ProjectImportResult:
+        """Hydrate an exported bundle via :class:`ProjectImportService`."""
+
+        bundle_root = Path(bundle_root)
+        result = self._import_service.import_bundle(
+            bundle_root,
+            destination_root=destination_root,
+            manifest_filename=manifest_filename,
+            project_filename=project_filename,
+        )
+        self._last_import_result = result
+        self._manifest_path = result.manifest_path
+        self._import_asset_count = len(result.sampler_assets)
+        self._import_dialog_filters = self._filters_from_import_result(result)
+        tracker_state = getattr(self.layout_state, "tracker", None)
+        if tracker_state is not None:
+            self._apply_import_plan(tracker_state)
+            if self.transport_controls is not None:
+                self.transport_controls.apply_state(tracker_state)
+        return result
 
     def enable_autosave(
         self,
@@ -208,10 +241,24 @@ class TrackerMixerRoot(BoxLayout):
     # Autosave and import helpers
     # ------------------------------------------------------------------
     def _apply_import_plan(self, tracker_state: TrackerPanelState) -> None:
-        if self._import_plan is None:
+        tracker_state.import_dialog_filters = list(self._import_dialog_filters)
+        tracker_state.import_asset_count = self._import_asset_count
+        self._apply_import_summary(tracker_state)
+
+    def _apply_import_summary(self, tracker_state: TrackerPanelState) -> None:
+        result = self._last_import_result
+        if result is None:
+            tracker_state.import_manifest_sha256 = None
+            tracker_state.import_bundle_root = None
+            tracker_state.import_sampler_asset_names = []
             return
-        tracker_state.import_dialog_filters = list(self._import_plan.dialog_filters)
-        tracker_state.import_asset_count = self._import_plan.asset_count
+        tracker_state.import_manifest_sha256 = result.manifest_sha256
+        tracker_state.import_bundle_root = str(
+            result.copied_root or result.manifest_path.parent
+        )
+        tracker_state.import_sampler_asset_names = [
+            asset.record.asset_name for asset in result.sampler_assets
+        ]
 
     def _maybe_autosave(self, batch: PreviewBatchState) -> None:
         config = self._autosave_config
@@ -291,6 +338,22 @@ class TrackerMixerRoot(BoxLayout):
         except Exception:  # pragma: no cover - malformed manifest fallback
             assets = []
         return manifest_sha, assets
+
+    def _filters_from_import_result(
+        self, result: ProjectImportResult
+    ) -> List[Mapping[str, Sequence[str]]]:
+        suffixes = {
+            Path(asset.record.relative_path).suffix
+            or Path(asset.record.asset_name).suffix
+            for asset in result.sampler_assets
+        }
+        patterns = [f"*{suffix}" if suffix else "*" for suffix in sorted(suffixes)]
+        return [
+            {
+                "label": "Imported Assets",
+                "patterns": patterns or ["*.wav", "*.flac"],
+            }
+        ]
 
 
 class TrackerMixerApp(App):

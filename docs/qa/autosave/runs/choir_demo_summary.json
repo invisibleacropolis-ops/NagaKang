@@ -1,0 +1,8 @@
+{
+  "iterations": 6,
+  "checkpoints_written": 5,
+  "pruned_checkpoints": 1,
+  "latest_prompt": "Autosaved choir_demo at 20251115-192142 (manifest 1af91433). Check .autosave/choir_demo for recovery.",
+  "duration_seconds": 6.308126754000114,
+  "autosave_dir": "docs/qa/autosave/.autosave/choir_demo"
+}
